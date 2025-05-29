@@ -6,30 +6,88 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}TastyTrade Tracker{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/stripe-inspired-overrides.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-lg navbar-light bg-light">
-            <div class="container-fluid">
-                <a class="navbar-brand" href="/">TastyTrade Tracker</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="collapse navbar-collapse" id="navbarNav">
-                    <ul class="navbar-nav ms-auto">
-                        <li class="nav-item"><a class="nav-link" href="/">Dashboard</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/accounts/">Accounts</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/positions/">Positions</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/transactions/">Transactions</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/reports/">Reports</a></li>
-                        <!-- Add login/logout/profile links here as needed -->
-                    </ul>
+        <nav class="navbar stripe-navbar navbar-expand-lg navbar-light bg-light flex-column align-items-start">
+            <div class="container-fluid flex-column align-items-start p-0 w-100">
+                <!-- Brand -->
+                <a class="navbar-brand mb-2 ms-2" href="/">TastyTrade Tracker</a>
+                <!-- Sync/Manage Button below brand -->
+                <div class="mb-3 ms-2">
+                    {% if tastytrade_credential %}
+                        <form method="post" action="{% url 'tastytrade_sync' %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-stripe stripe-action">Sync Now</button>
+                        </form>
+                    {% else %}
+                        <a href="{% url 'tastytrade_connect' %}" class="btn btn-stripe stripe-action">Manage Credentials</a>
+                    {% endif %}
+                </div>
+                <!-- Navbar row -->
+                <div class="w-100">
+                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                    <div class="collapse navbar-collapse" id="navbarNav">
+                        <ul class="navbar-nav flex-row align-items-center me-auto mb-0">
+                            <li class="nav-item"><a class="nav-link stripe-nav-link fw-bold" href="/">Dashboard</a></li>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link stripe-nav-link dropdown-toggle" href="#" id="accountsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Accounts</a>
+                                <ul class="dropdown-menu stripe-dropdown" aria-labelledby="accountsDropdown">
+                                    <li><a class="dropdown-item" href="/accounts/">All Accounts</a></li>
+                                    <li><a class="dropdown-item" href="/accounts/email/">Email Settings</a></li>
+                                </ul>
+                            </li>
+                            <li class="nav-item"><a class="nav-link stripe-nav-link" href="/positions/">Positions</a></li>
+                            <li class="nav-item"><a class="nav-link stripe-nav-link" href="/transactions/">Transactions</a></li>
+                            <li class="nav-item"><a class="nav-link stripe-nav-link" href="/reports/">Reports</a></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </nav>
     </header>
     <main class="container my-4">
+        {% if messages %}
+          <div class="container mt-3">
+            {% for message in messages %}
+              <div class="alert alert-{{ message.tags }} d-flex justify-content-between align-items-center">
+                <span>
+                  {{ message }}
+                  {% if tastytrade_credential and message.tags == "success" %}
+                    <small class="text-muted ms-2">
+                      (Last Sync:
+                      {% if tastytrade_credential.last_sync %}
+                        {{ tastytrade_credential.last_sync|date:"Y-m-d H:i" }}
+                      {% else %}
+                        Never
+                      {% endif %}
+                      )
+                    </small>
+                  {% endif %}
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% if tastytrade_credential %}
+          <div class="alert alert-success">
+            <strong>Connected as:</strong> {{ tastytrade_credential.username }}<br>
+            <strong>Last Sync:</strong>
+            {% if tastytrade_credential.last_sync %}
+              {{ tastytrade_credential.last_sync|date:"Y-m-d H:i" }}
+            {% else %}
+              Never
+            {% endif %}
+            <br>
+          </div>
+        {% else %}
+          <div class="alert alert-warning">No TastyTrade account connected.</div>
+          <a href="{% url 'tastytrade_connect' %}" class="btn btn-primary">Connect Account</a>
+        {% endif %}
         {% block content %}{% endblock %}
     </main>
     <footer class="footer mt-auto py-3 bg-light">

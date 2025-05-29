@@ -1,0 +1,568 @@
+/* Stripe-Inspired Bootstrap Overrides for TastyTrade Tracker */
+:root {
+  --tt-primary: #635BFF;
+  --tt-primary-dark: #4B44C2;
+  --tt-primary-light: #857DFF;
+  --tt-secondary: #0A2540;
+  --tt-secondary-light: #1D3E5F;
+  --tt-accent: #00D4FF;
+  --tt-surface: #FFFFFF;
+  --tt-container: #F6F9FC;
+  --tt-container-dark: #E6EBF1;
+  --tt-text-primary: #1A1F36;
+  --tt-text-secondary: #697386;
+  --tt-text-disabled: #A5AFBD;
+  --tt-border-neutral: #E6EBF1;
+  --tt-border-focus: #635BFF;
+  --tt-success: #32D583;
+  --tt-info: #3E7BFA;
+  --tt-warning: #FFC107;
+  --tt-error: #FF4757;
+  --tt-success-light: #E3F9EF;
+  --tt-info-light: #EBF2FF;
+  --tt-warning-light: #FFF8E6;
+  --tt-error-light: #FFEBEE;
+  --tt-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  --tt-font-size-xs: 0.75rem;
+  --tt-font-size-sm: 0.875rem;
+  --tt-font-size-md: 1rem;
+  --tt-font-size-lg: 1.125rem;
+  --tt-font-size-xl: 1.25rem;
+  --tt-font-size-2xl: 1.5rem;
+  --tt-font-size-3xl: 1.875rem;
+  --tt-font-size-4xl: 2.25rem;
+  --tt-font-weight-normal: 400;
+  --tt-font-weight-medium: 500;
+  --tt-font-weight-semibold: 600;
+  --tt-font-weight-bold: 700;
+  --tt-line-height-tight: 1.2;
+  --tt-line-height-normal: 1.5;
+  --tt-line-height-loose: 1.8;
+  --tt-space-1: 0.25rem;
+  --tt-space-2: 0.5rem;
+  --tt-space-3: 0.75rem;
+  --tt-space-4: 1rem;
+  --tt-space-5: 1.5rem;
+  --tt-space-6: 2rem;
+  --tt-space-7: 2.5rem;
+  --tt-space-8: 3rem;
+  --tt-space-9: 4rem;
+  --tt-space-10: 5rem;
+  --tt-radius-sm: 4px;
+  --tt-radius-md: 8px;
+  --tt-radius-lg: 12px;
+  --tt-radius-full: 9999px;
+  --tt-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --tt-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --tt-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --tt-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Buttons */
+.btn-primary {
+  background-color: var(--tt-primary);
+  border-color: var(--tt-primary);
+  border-radius: var(--tt-radius-md);
+  font-weight: var(--tt-font-weight-medium);
+  padding: 0.625rem 1.25rem;
+  transition: all 0.15s ease;
+  box-shadow: var(--tt-shadow-sm);
+}
+.btn-primary:hover, .btn-primary:focus {
+  background-color: var(--tt-primary-dark);
+  border-color: var(--tt-primary-dark);
+  transform: translateY(-1px);
+  box-shadow: var(--tt-shadow-md);
+}
+.btn-secondary {
+  background-color: white;
+  border-color: var(--tt-border-neutral);
+  color: var(--tt-text-primary);
+  border-radius: var(--tt-radius-md);
+  font-weight: var(--tt-font-weight-medium);
+  padding: 0.625rem 1.25rem;
+  transition: all 0.15s ease;
+}
+.btn-secondary:hover, .btn-secondary:focus {
+  background-color: var(--tt-container);
+  border-color: var(--tt-border-neutral);
+  color: var(--tt-text-primary);
+}
+.btn-outline-primary {
+  color: var(--tt-primary);
+  border-color: var(--tt-primary);
+  border-radius: var(--tt-radius-md);
+  font-weight: var(--tt-font-weight-medium);
+  padding: 0.625rem 1.25rem;
+}
+.btn-outline-primary:hover, .btn-outline-primary:focus {
+  background-color: var(--tt-primary);
+  color: white;
+}
+
+/* Cards */
+.card {
+  border: 1px solid var(--tt-border-neutral);
+  border-radius: var(--tt-radius-lg);
+  box-shadow: var(--tt-shadow-sm);
+  transition: box-shadow 0.15s ease;
+}
+.card:hover {
+  box-shadow: var(--tt-shadow-md);
+}
+.card-header {
+  background-color: white;
+  border-bottom: 1px solid var(--tt-border-neutral);
+  padding: var(--tt-space-4) var(--tt-space-5);
+}
+.card-body {
+  padding: var(--tt-space-5);
+}
+.card-footer {
+  background-color: var(--tt-container);
+  border-top: 1px solid var(--tt-border-neutral);
+  padding: var(--tt-space-4) var(--tt-space-5);
+}
+
+/* Forms */
+.form-control {
+  border: 1px solid var(--tt-border-neutral);
+  border-radius: var(--tt-radius-md);
+  padding: 0.625rem 0.75rem;
+  font-size: var(--tt-font-size-md);
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+.form-control:focus {
+  border-color: var(--tt-border-focus);
+  box-shadow: 0 0 0 4px rgba(99, 91, 255, 0.15);
+}
+.form-label {
+  font-size: var(--tt-font-size-sm);
+  font-weight: var(--tt-font-weight-medium);
+  color: var(--tt-text-secondary);
+  margin-bottom: var(--tt-space-2);
+}
+.form-text {
+  font-size: var(--tt-font-size-sm);
+  color: var(--tt-text-secondary);
+  margin-top: var(--tt-space-2);
+}
+
+/* Alerts */
+.alert {
+  border: none;
+  border-radius: var(--tt-radius-md);
+  padding: var(--tt-space-4) var(--tt-space-5);
+}
+.alert-success {
+  background-color: var(--tt-success-light);
+  color: var(--tt-success);
+}
+.alert-info {
+  background-color: var(--tt-info-light);
+  color: var(--tt-info);
+}
+.alert-warning {
+  background-color: var(--tt-warning-light);
+  color: var(--tt-warning);
+}
+.alert-danger {
+  background-color: var(--tt-error-light);
+  color: var(--tt-error);
+}
+
+/* Badges */
+.badge {
+  font-weight: var(--tt-font-weight-medium);
+  padding: 0.35em 0.65em;
+  border-radius: var(--tt-radius-full);
+}
+.badge-primary {
+  background-color: var(--tt-primary);
+}
+.badge-success {
+  background-color: var(--tt-success);
+}
+.badge-info {
+  background-color: var(--tt-info);
+}
+.badge-warning {
+  background-color: var(--tt-warning);
+  color: var(--tt-text-primary);
+}
+.badge-danger {
+  background-color: var(--tt-error);
+}
+
+/* Tables */
+.table {
+  --bs-table-bg: transparent;
+  --bs-table-striped-bg: var(--tt-container);
+  --bs-table-striped-color: var(--tt-text-primary);
+  --bs-table-active-bg: var(--tt-container-dark);
+  --bs-table-active-color: var(--tt-text-primary);
+  --bs-table-hover-bg: var(--tt-container);
+  --bs-table-hover-color: var(--tt-text-primary);
+  border-color: var(--tt-border-neutral);
+}
+
+/* --- Stripe-Inspired Navbar (Stripe.com accurate) --- */
+.stripe-navbar, .navbar {
+  background: var(--tt-surface) !important;
+  box-shadow: 0 2px 8px 0 rgba(99,91,255,0.04);
+  border-bottom: 1.5px solid var(--tt-border-neutral);
+  font-family: var(--tt-font-family);
+  min-height: 64px;
+  padding-left: var(--tt-space-6);
+  padding-right: var(--tt-space-6);
+  z-index: 1000;
+}
+
+.navbar-brand {
+  font-size: var(--tt-font-size-xl);
+  font-weight: var(--tt-font-weight-bold);
+  color: var(--tt-primary) !important;
+  letter-spacing: -0.5px;
+  padding-left: 0;
+  margin-right: var(--tt-space-6);
+  transition: color 0.18s;
+}
+.navbar-brand:hover {
+  color: var(--tt-primary-dark) !important;
+}
+
+.navbar-nav {
+  gap: var(--tt-space-2);
+}
+
+.stripe-nav-link, .navbar-nav .nav-link {
+  color: var(--tt-text-secondary) !important;
+  font-weight: var(--tt-font-weight-semibold);
+  font-size: var(--tt-font-size-md);
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--tt-radius-full);
+  background: none !important;
+  border: none !important;
+  transition: color 0.18s, background 0.18s;
+  margin-right: 0.25rem;
+}
+.stripe-nav-link.active, .navbar-nav .nav-link.active,
+.stripe-nav-link:focus, .navbar-nav .nav-link:focus,
+.stripe-nav-link:hover, .navbar-nav .nav-link:hover {
+  color: var(--tt-primary) !important;
+  background: var(--tt-container-dark);
+  text-decoration: none;
+}
+
+/* --- Stripe-Inspired Primary Action Button --- */
+.btn-stripe, .btn-primary.stripe-action {
+  background: linear-gradient(90deg, var(--tt-primary) 60%, var(--tt-accent) 100%);
+  color: #fff !important;
+  font-weight: var(--tt-font-weight-bold);
+  font-size: var(--tt-font-size-md);
+  border-radius: var(--tt-radius-full);
+  box-shadow: var(--tt-shadow-md);
+  padding: 0.5rem 1.75rem;
+  border: none;
+  letter-spacing: 0.5px;
+  transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
+  margin-left: var(--tt-space-3);
+}
+.btn-stripe:hover, .btn-primary.stripe-action:hover {
+  background: linear-gradient(90deg, var(--tt-primary-dark) 60%, var(--tt-accent) 100%);
+  box-shadow: var(--tt-shadow-lg);
+  transform: translateY(-2px) scale(1.03);
+}
+
+/* --- Footer --- */
+.footer {
+  background: var(--tt-surface);
+  border-top: 1.5px solid var(--tt-border-neutral);
+  box-shadow: 0 -2px 8px 0 rgba(99,91,255,0.03);
+  font-family: var(--tt-font-family);
+  font-size: var(--tt-font-size-sm);
+  color: var(--tt-text-secondary);
+  padding: var(--tt-space-6) 0 var(--tt-space-4) 0;
+}
+.footer .text-muted {
+  color: var(--tt-text-secondary) !important;
+}
+
+/* --- Stripe-Inspired Sync Button --- */
+.btn-sync, .btn-primary.sync-now {
+  background: linear-gradient(90deg, var(--tt-primary) 60%, var(--tt-accent) 100%);
+  color: #fff !important;
+  font-weight: var(--tt-font-weight-bold);
+  font-size: var(--tt-font-size-lg);
+  border-radius: var(--tt-radius-full);
+  box-shadow: var(--tt-shadow-md);
+  padding: 0.75rem 2.25rem;
+  border: none;
+  letter-spacing: 0.5px;
+  transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
+}
+.btn-sync:hover, .btn-primary.sync-now:hover {
+  background: linear-gradient(90deg, var(--tt-primary-dark) 60%, var(--tt-accent) 100%);
+  box-shadow: var(--tt-shadow-lg);
+  transform: translateY(-2px) scale(1.03);
+}
+
+/* --- Stripe-Inspired Dropdown Menu --- */
+.stripe-dropdown, .dropdown-menu {
+  background: #fff;
+  border: 1.5px solid var(--tt-border-neutral);
+  border-radius: var(--tt-radius-lg);
+  box-shadow: 0 8px 32px 0 rgba(99,91,255,0.08);
+  min-width: 200px;
+  padding: var(--tt-space-2) 0;
+  margin-top: var(--tt-space-2);
+  font-family: var(--tt-font-family);
+}
+.stripe-dropdown .dropdown-item, .dropdown-menu .dropdown-item {
+  color: var(--tt-text-secondary);
+  font-size: var(--tt-font-size-md);
+  font-weight: var(--tt-font-weight-medium);
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--tt-radius-md);
+  transition: background 0.15s, color 0.15s;
+}
+.stripe-dropdown .dropdown-item:hover, .dropdown-menu .dropdown-item:hover {
+  background: var(--tt-container-dark);
+  color: var(--tt-primary);
+}
+
+/* --- Hamburger & Mobile Nav --- */
+.navbar-toggler {
+  border: none;
+  background: none;
+  outline: none;
+  box-shadow: none;
+}
+.navbar-toggler-icon {
+  background-image: none;
+  width: 1.5em;
+  height: 1.5em;
+  position: relative;
+  display: inline-block;
+}
+.navbar-toggler-icon:before, .navbar-toggler-icon:after, .navbar-toggler-icon div {
+  content: '';
+  display: block;
+  background: var(--tt-text-primary);
+  height: 3px;
+  border-radius: 2px;
+  margin: 5px 0;
+  transition: all 0.2s;
+}
+.navbar-toggler-icon:before { margin-top: 0; }
+.navbar-toggler-icon:after { margin-bottom: 0; }
+
+@media (max-width: 991.98px) {
+  .navbar-collapse {
+    background: #fff;
+    box-shadow: 0 8px 32px 0 rgba(99,91,255,0.08);
+    border-radius: var(--tt-radius-lg);
+    margin-top: var(--tt-space-2);
+    padding: var(--tt-space-4);
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 999;
+  }
+  .navbar-nav {
+    flex-direction: column;
+    gap: var(--tt-space-2);
+  }
+  .navbar-nav .nav-link {
+    padding: 0.75rem 1.5rem;
+    font-size: var(--tt-font-size-lg);
+  }
+  .d-flex.align-items-center.gap-2 {
+    margin-top: var(--tt-space-3);
+    justify-content: flex-start;
+  }
+}
+
+/* --- Force horizontal navbar on desktop (fix for vertical nav issue) --- */
+@media (min-width: 992px) {
+  .navbar-nav.flex-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center;
+    gap: var(--tt-space-2);
+  }
+  .navbar-nav.flex-row .nav-item {
+    margin-right: 1rem;
+  }
+  .navbar-nav.flex-row .nav-item:last-child {
+    margin-right: 0;
+  }
+}
+
+/* Remove bullets from dropdown menus */
+.dropdown-menu {
+  list-style: none !important;
+  padding-left: 0 !important;
+}
+
+/* Stripe-style horizontal navbar row */
+.navbar .container-fluid {
+  display: flex;
+  align-items: center;
+}
+.navbar-brand {
+  margin-right: 2rem;
+  display: flex;
+  align-items: center;
+}
+.navbar-nav.flex-row {
+  flex-direction: row !important;
+  gap: 0.5rem;
+}
+.navbar-nav .nav-item {
+  display: flex;
+  align-items: center;
+}
+.d-flex.align-items-center.ms-auto {
+  margin-left: auto !important;
+}
+
+/* Navbar dropdown alignment fix */
+.navbar-nav > .nav-item {
+  margin-bottom: 0 !important;
+  margin-top: 0 !important;
+  display: flex;
+  align-items: center;
+}
+.navbar-nav > .nav-item.dropdown {
+  display: flex;
+  align-items: center;
+}
+.navbar-nav .dropdown-toggle {
+  margin-bottom: 0 !important;
+  margin-top: 0 !important;
+  display: flex;
+  align-items: center;
+}
+
+/* Brand and sync/credentials button alignment tweaks */
+.navbar .container-fluid.d-block > .d-flex.align-items-center.mb-2 {
+  margin-bottom: 0.25rem;
+}
+.navbar .container-fluid.d-block > .d-flex.align-items-center.mb-2 + .d-flex.align-items-center.mb-2 {
+  margin-bottom: 1.25rem;
+}
+
+/* Visually separate navbar row */
+.navbar .navbar-collapse {
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--tt-border-neutral);
+}
+
+/* Make Manage Credentials button visually distinct */
+.btn-outline-primary.stripe-action {
+  background: #fff !important;
+  color: var(--tt-primary) !important;
+  border: 2px solid var(--tt-primary) !important;
+  border-radius: var(--tt-radius-full);
+  font-weight: var(--tt-font-weight-bold);
+  font-size: var(--tt-font-size-md);
+  box-shadow: var(--tt-shadow-sm);
+  padding: 0.5rem 1.75rem;
+  letter-spacing: 0.5px;
+  transition: background 0.18s, color 0.18s, box-shadow 0.18s, border-color 0.18s;
+}
+.btn-outline-primary.stripe-action:hover, .btn-outline-primary.stripe-action:focus {
+  background: var(--tt-primary-light) !important;
+  color: #fff !important;
+  border-color: var(--tt-primary-dark) !important;
+  box-shadow: var(--tt-shadow-md);
+}
+
+/* Ensure button row under brand is spaced */
+.navbar .container-fluid.d-block > .d-flex.align-items-center.mb-3 {
+  margin-top: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Stripe-inspired primary and secondary action buttons */
+.btn-stripe.stripe-action, .btn-outline-primary.stripe-action {
+  background: linear-gradient(90deg, var(--tt-primary) 60%, var(--tt-accent) 100%) !important;
+  color: #fff !important;
+  font-weight: var(--tt-font-weight-bold);
+  font-size: var(--tt-font-size-md);
+  border-radius: var(--tt-radius-full);
+  box-shadow: var(--tt-shadow-md);
+  padding: 0.5rem 1.75rem;
+  border: none;
+  letter-spacing: 0.5px;
+  transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
+  margin-left: 0;
+}
+.btn-stripe.stripe-action:hover, .btn-outline-primary.stripe-action:hover, .btn-stripe.stripe-action:focus, .btn-outline-primary.stripe-action:focus {
+  background: linear-gradient(90deg, var(--tt-primary-dark) 60%, var(--tt-accent) 100%) !important;
+  box-shadow: var(--tt-shadow-lg);
+  transform: translateY(-2px) scale(1.03);
+  color: #fff !important;
+}
+
+/* Dropdown menu floating style */
+.dropdown-menu.stripe-dropdown {
+  box-shadow: 0 8px 32px 0 rgba(99,91,255,0.12);
+  border: 1.5px solid var(--tt-border-neutral);
+  border-radius: var(--tt-radius-lg);
+  min-width: 200px;
+  margin-top: 0.5rem;
+  padding: var(--tt-space-2) 0;
+  background: #fff;
+}
+
+/* Force dropdown menu to float and not appear inline in nav bar */
+.navbar-nav.flex-row > .nav-item.dropdown {
+  position: relative;
+}
+.navbar-nav.flex-row > .nav-item.dropdown .dropdown-menu {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  min-width: 200px;
+  display: none;
+  z-index: 1000;
+}
+.navbar-nav.flex-row > .nav-item.dropdown.show .dropdown-menu,
+.navbar-nav.flex-row > .nav-item.dropdown .dropdown-menu.show {
+  display: block;
+}
+
+/* Ensure sync/manage button row under brand is left-aligned and spaced */
+.navbar .mb-3.ms-2 {
+  margin-left: 0.25rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: flex-start;
+}
+
+/* Ensure navbar row is horizontal and not stacked */
+.navbar .w-100 {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+/* Fix dropdown menu floating and visibility */
+.navbar-nav.flex-row > .nav-item.dropdown {
+  position: relative;
+}
+.navbar-nav.flex-row > .nav-item.dropdown .dropdown-menu {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  min-width: 200px;
+  display: none;
+  z-index: 1000;
+}
+.navbar-nav.flex-row > .nav-item.dropdown.show .dropdown-menu,
+.navbar-nav.flex-row > .nav-item.dropdown .dropdown-menu.show {
+  display: block;
+} 
