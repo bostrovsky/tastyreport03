@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row mb-5">
+  <div class="col-12">
+    <h1 class="tt-heading-1 mb-4">Dashboard</h1>
+  </div>
+</div>
+
+<!-- Account Status Section -->
+{% if not tastytrade_credential %}
+<div class="row mb-5">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body text-center py-5">
+        <h3 class="tt-heading-3 mb-3">Connect Your TastyTrade Account</h3>
+        <p class="tt-text-secondary mb-4">Get started by connecting your TastyTrade account to sync your trading data.</p>
+        <a href="{% url 'tastytrade_connect' %}" class="btn btn-primary stripe-action">Connect Account</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+
+<!-- Stats Row -->
+<div class="row mb-5">
+  <div class="col-md-3 mb-4">
+    <div class="tt-stat-card">
+      <div class="tt-stat-card-label">Account Status</div>
+      <div class="tt-stat-card-value">Connected</div>
+      <div class="tt-stat-card-change tt-positive">{{ tastytrade_credential.username }}</div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-4">
+    <div class="tt-stat-card">
+      <div class="tt-stat-card-label">Last Sync</div>
+      <div class="tt-stat-card-value">
+        {% if tastytrade_credential.last_sync %}
+          {{ tastytrade_credential.last_sync|date:"M j" }}
+        {% else %}
+          Never
+        {% endif %}
+      </div>
+      <div class="tt-stat-card-change">
+        {% if tastytrade_credential.last_sync %}
+          {{ tastytrade_credential.last_sync|date:"H:i" }}
+        {% else %}
+          Sync now to get started
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-4">
+    <div class="tt-stat-card">
+      <div class="tt-stat-card-label">Total Positions</div>
+      <div class="tt-stat-card-value">--</div>
+      <div class="tt-stat-card-change">Available after sync</div>
+    </div>
+  </div>
+  <div class="col-md-3 mb-4">
+    <div class="tt-stat-card">
+      <div class="tt-stat-card-label">P&L Today</div>
+      <div class="tt-stat-card-value">--</div>
+      <div class="tt-stat-card-change">Available after sync</div>
+    </div>
+  </div>
+</div>
+
+<!-- Sync progress is now handled by the global status box in base.html -->
+
+<!-- Recent Activity Placeholder -->
+<div class="row">
+  <div class="col-12">
+    <div class="tt-data-table-container">
+      <div class="tt-data-table-header">
+        <h3 class="tt-heading-3 mb-0">Recent Activity</h3>
+        <div class="tt-data-table-actions">
+          <button class="btn btn-sm btn-outline-primary" disabled>Coming Soon</button>
+        </div>
+      </div>
+      <div class="card-body text-center py-5">
+        <p class="tt-text-secondary">Your recent trading activity will appear here after syncing your data.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %} 

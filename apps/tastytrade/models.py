@@ -16,6 +16,79 @@ class TastyTradeCredential(models.Model):
     refresh_token = EncryptedCharField(max_length=512, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    last_sync = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.user.username} ({self.environment})"
+
+class Position(models.Model):
+    ASSET_TYPE_CHOICES = [
+        ("stock", "Stock"),
+        ("option", "Option"),
+        ("future", "Future"),
+        ("crypto", "Crypto"),
+        ("other", "Other"),
+    ]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    credential = models.ForeignKey('TastyTradeCredential', on_delete=models.CASCADE)
+    tastytrade_account_number = models.CharField(max_length=32)
+    asset_type = models.CharField(max_length=16, choices=ASSET_TYPE_CHOICES)
+    symbol = models.CharField(max_length=64)
+    description = models.CharField(max_length=256, blank=True)
+    quantity = models.DecimalField(max_digits=20, decimal_places=4)
+    average_price = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
+    market_value = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
+    unrealized_pnl = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
+    realized_pnl = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
+    delta = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
+    theta = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
+    beta = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
+    expiry = models.DateField(null=True, blank=True)
+    strike = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
+    option_type = models.CharField(max_length=4, choices=[("call", "Call"), ("put", "Put")], null=True, blank=True)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("user", "credential", "tastytrade_account_number", "asset_type", "symbol", "expiry", "strike", "option_type")
+        indexes = [
+            models.Index(fields=["user", "tastytrade_account_number", "asset_type", "symbol"]),
+        ]
+
+    def __str__(self):
+        return f"{self.symbol} ({self.asset_type}) - {self.quantity}"
+
+class Transaction(models.Model):
+    TRANSACTION_TYPE_CHOICES = [
+        ("trade", "Trade"),
+        ("dividend", "Dividend"),
+        ("fee", "Fee"),
+        ("interest", "Interest"),
+        ("other", "Other"),
+    ]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    credential = models.ForeignKey('TastyTradeCredential', on_delete=models.CASCADE)
+    tastytrade_account_number = models.CharField(max_length=32)
+    transaction_id = models.CharField(max_length=64, unique=True)
+    transaction_type = models.CharField(max_length=16, choices=TRANSACTION_TYPE_CHOICES)
+    symbol = models.CharField(max_length=64, blank=True)
+    description = models.CharField(max_length=256, blank=True)
+    quantity = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
+    price = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
+    amount = models.DecimalField(max_digits=20, decimal_places=2)
+    trade_date = models.DateTimeField()
+    asset_type = models.CharField(max_length=16, blank=True)
+    expiry = models.DateField(null=True, blank=True)
+    strike = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
+    option_type = models.CharField(max_length=4, choices=[("call", "Call"), ("put", "Put")], null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "tastytrade_account_number", "transaction_type", "symbol"]),
+        ]
+        ordering = ["-trade_date"]
+
+    def __str__(self):
+        return f"{self.transaction_type} {self.symbol} {self.amount} on {self.trade_date}"

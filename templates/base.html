@@ -9,84 +9,95 @@
     <link rel="stylesheet" href="{% static 'css/stripe-inspired-overrides.css' %}">
     {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body class="tt-bg-container">
     <header>
-        <nav class="navbar stripe-navbar navbar-expand-lg navbar-light bg-light flex-column align-items-start">
-            <div class="container-fluid flex-column align-items-start p-0 w-100">
+        <nav class="navbar navbar-expand-lg stripe-navbar">
+            <div class="container-fluid">
                 <!-- Brand -->
-                <a class="navbar-brand mb-2 ms-2" href="/">TastyTrade Tracker</a>
-                <!-- Sync/Manage Button below brand -->
-                <div class="mb-3 ms-2">
-                    {% if tastytrade_credential %}
-                        <form method="post" action="{% url 'tastytrade_sync' %}" class="d-inline">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-stripe stripe-action">Sync Now</button>
-                        </form>
-                    {% else %}
-                        <a href="{% url 'tastytrade_connect' %}" class="btn btn-stripe stripe-action">Manage Credentials</a>
-                    {% endif %}
-                </div>
-                <!-- Navbar row -->
-                <div class="w-100">
-                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                        <span class="navbar-toggler-icon"></span>
-                    </button>
-                    <div class="collapse navbar-collapse" id="navbarNav">
-                        <ul class="navbar-nav flex-row align-items-center me-auto mb-0">
-                            <li class="nav-item"><a class="nav-link stripe-nav-link fw-bold" href="/">Dashboard</a></li>
-                            <li class="nav-item dropdown">
-                                <a class="nav-link stripe-nav-link dropdown-toggle" href="#" id="accountsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">Accounts</a>
-                                <ul class="dropdown-menu stripe-dropdown" aria-labelledby="accountsDropdown">
-                                    <li><a class="dropdown-item" href="/accounts/">All Accounts</a></li>
-                                    <li><a class="dropdown-item" href="/accounts/email/">Email Settings</a></li>
-                                </ul>
-                            </li>
-                            <li class="nav-item"><a class="nav-link stripe-nav-link" href="/positions/">Positions</a></li>
-                            <li class="nav-item"><a class="nav-link stripe-nav-link" href="/transactions/">Transactions</a></li>
-                            <li class="nav-item"><a class="nav-link stripe-nav-link" href="/reports/">Reports</a></li>
-                        </ul>
+                <a class="navbar-brand" href="/">TastyTrade Tracker</a>
+                
+                <!-- Mobile toggle button -->
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                
+                <!-- Navigation items -->
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/">Dashboard</a>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="accountsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Accounts
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="accountsDropdown">
+                                <li><a class="dropdown-item" href="/accounts/">All Accounts</a></li>
+                                <li><a class="dropdown-item" href="/accounts/email/">Email Settings</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/positions/">Positions</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/transactions/">Transactions</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/reports/">Reports</a>
+                        </li>
+                    </ul>
+                    
+                    <!-- Right-side actions -->
+                    <div class="d-flex align-items-center">
+                        {% if tastytrade_credential %}
+                            <form method="post" action="{% url 'tastytrade_sync' %}" class="d-inline" id="navbar-sync-form">
+                                {% csrf_token %}
+                                <button type="submit" class="btn stripe-action" id="navbar-sync-button"
+                                        data-sync-status="{% if tastytrade_credential.last_sync %}synced{% else %}never{% endif %}"
+                                        data-last-sync="{{ tastytrade_credential.last_sync|default:'' }}">
+                                    <span id="navbar-sync-text">
+                                        <i class="fas fa-sync-alt me-1"></i>Sync
+                                    </span>
+                                    <span id="navbar-sync-loading" class="d-none">
+                                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                        Sync
+                                    </span>
+                                </button>
+                            </form>
+                        {% else %}
+                            <a href="{% url 'tastytrade_connect' %}" class="btn btn-outline-primary stripe-action">Connect Account</a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
         </nav>
     </header>
+    
+    <!-- Global Sync Status Box -->
+    <div id="global-sync-status" class="container mt-3 d-none">
+        <div class="alert" id="sync-status-alert">
+            <div class="d-flex align-items-center">
+                <div id="sync-status-icon" class="me-3">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                </div>
+                <div class="flex-grow-1">
+                    <div id="sync-status-title" class="fw-bold">Syncing your TastyTrade data...</div>
+                    <div id="sync-status-detail" class="small text-muted mt-1">Authenticating with TastyTrade...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <main class="container my-4">
         {% if messages %}
-          <div class="container mt-3">
+          <div class="mb-4">
             {% for message in messages %}
-              <div class="alert alert-{{ message.tags }} d-flex justify-content-between align-items-center">
-                <span>
-                  {{ message }}
-                  {% if tastytrade_credential and message.tags == "success" %}
-                    <small class="text-muted ms-2">
-                      (Last Sync:
-                      {% if tastytrade_credential.last_sync %}
-                        {{ tastytrade_credential.last_sync|date:"Y-m-d H:i" }}
-                      {% else %}
-                        Never
-                      {% endif %}
-                      )
-                    </small>
-                  {% endif %}
-                </span>
+              <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
               </div>
             {% endfor %}
           </div>
-        {% endif %}
-        {% if tastytrade_credential %}
-          <div class="alert alert-success">
-            <strong>Connected as:</strong> {{ tastytrade_credential.username }}<br>
-            <strong>Last Sync:</strong>
-            {% if tastytrade_credential.last_sync %}
-              {{ tastytrade_credential.last_sync|date:"Y-m-d H:i" }}
-            {% else %}
-              Never
-            {% endif %}
-            <br>
-          </div>
-        {% else %}
-          <div class="alert alert-warning">No TastyTrade account connected.</div>
-          <a href="{% url 'tastytrade_connect' %}" class="btn btn-primary">Connect Account</a>
         {% endif %}
         {% block content %}{% endblock %}
     </main>
@@ -96,5 +107,234 @@
         </div>
     </footer>
     <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const navbarSyncForm = document.getElementById('navbar-sync-form');
+        const navbarSyncButton = document.getElementById('navbar-sync-button');
+        const navbarSyncText = document.getElementById('navbar-sync-text');
+        const navbarSyncLoading = document.getElementById('navbar-sync-loading');
+        const syncProgress = document.getElementById('sync-progress');
+        const syncProgressText = document.getElementById('sync-progress-text');
+        
+        // Hide old dashboard sync progress if it exists (since we're using global now)
+        if (syncProgress) {
+            syncProgress.style.display = 'none';
+        }
+        
+        // Intercept Django success messages and show in global status
+        const djangoMessages = document.querySelectorAll('.alert-success');
+        djangoMessages.forEach(function(message) {
+            const messageText = message.textContent.trim();
+            if (messageText.includes('Sync completed successfully') || messageText.includes('sync')) {
+                // Hide the Django message
+                message.style.display = 'none';
+                
+                // Show in global status with timestamp
+                const now = new Date();
+                const timestamp = now.toLocaleTimeString();
+                showSyncStatus('success', 'Sync Completed Successfully', `Your TastyTrade data has been updated at ${timestamp}`);
+                
+                // Update button to synced state
+                if (navbarSyncButton) {
+                    navbarSyncButton.setAttribute('data-sync-status', 'synced');
+                    // Reset button to normal state
+                    if (navbarSyncText && navbarSyncLoading) {
+                        navbarSyncText.classList.remove('d-none');
+                        navbarSyncLoading.classList.add('d-none');
+                        navbarSyncButton.disabled = false;
+                    }
+                }
+            }
+        });
+        
+        if (navbarSyncForm) {
+            navbarSyncForm.addEventListener('submit', function(e) {
+                // Show loading state immediately
+                navbarSyncText.classList.add('d-none');
+                navbarSyncLoading.classList.remove('d-none');
+                navbarSyncButton.disabled = true;
+                
+                // Set button to syncing state (blue)
+                navbarSyncButton.setAttribute('data-sync-status', 'syncing');
+                
+                // Show global status box
+                showSyncStatus('syncing', 'Syncing your TastyTrade data...', 'Authenticating with TastyTrade...');
+                
+                // Simulate progress updates (since we can't get real-time updates from Django sync)
+                let step = 0;
+                const steps = [
+                    'Authenticating with TastyTrade...',
+                    'Retrieving account information...',
+                    'Fetching positions data...',
+                    'Fetching transaction history...',
+                    'Saving data to database...',
+                    'Finalizing sync...'
+                ];
+                
+                const updateProgress = () => {
+                    if (step < steps.length) {
+                        const globalStatusDetail = document.getElementById('sync-status-detail');
+                        if (globalStatusDetail) {
+                            globalStatusDetail.textContent = steps[step];
+                        }
+                        step++;
+                        // Update every 2-3 seconds to simulate real progress
+                        setTimeout(updateProgress, 2500 + Math.random() * 1000);
+                    }
+                };
+                
+                // Start progress updates after a short delay
+                setTimeout(updateProgress, 500);
+            });
+        }
+        
+        // Function to show sync status in global status box
+        function showSyncStatus(type, title, detail) {
+            const globalStatus = document.getElementById('global-sync-status');
+            const statusAlert = document.getElementById('sync-status-alert');
+            const statusIcon = document.getElementById('sync-status-icon');
+            const statusTitle = document.getElementById('sync-status-title');
+            const statusDetail = document.getElementById('sync-status-detail');
+            
+            if (globalStatus && statusAlert && statusIcon && statusTitle && statusDetail) {
+                // Set content
+                statusTitle.textContent = title;
+                statusDetail.textContent = detail;
+                
+                // Clear existing alert classes
+                statusAlert.className = 'alert';
+                
+                // Set appropriate styles based on type
+                switch(type) {
+                    case 'syncing':
+                        statusAlert.classList.add('alert-primary');
+                        statusIcon.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+                        break;
+                    case 'success':
+                        statusAlert.classList.add('alert-success');
+                        statusIcon.innerHTML = '<i class="fas fa-check-circle"></i>';
+                        break;
+                    case 'warning':
+                        statusAlert.classList.add('alert-warning');
+                        statusIcon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                        break;
+                    case 'error':
+                        statusAlert.classList.add('alert-danger');
+                        statusIcon.innerHTML = '<i class="fas fa-times-circle"></i>';
+                        break;
+                }
+                
+                // Show the status box
+                globalStatus.classList.remove('d-none');
+                
+                // Auto-hide success/error messages after 5 seconds
+                if (type === 'success' || type === 'error') {
+                    setTimeout(() => {
+                        globalStatus.classList.add('d-none');
+                    }, 5000);
+                }
+            }
+        }
+        
+        // Update button state based on last sync time and market hours
+        if (navbarSyncButton) {
+            const lastSync = navbarSyncButton.dataset.lastSync;
+            if (lastSync) {
+                const lastSyncDate = new Date(lastSync);
+                const now = new Date();
+                const minutesSinceSync = (now - lastSyncDate) / (1000 * 60);
+                
+                // Check if markets are currently open (9:30 AM - 4:00 PM ET, Mon-Fri)
+                const isMarketHours = isMarketOpen(now);
+                
+                let isStale = false;
+                let statusText = '';
+                
+                if (isMarketHours) {
+                    // During market hours: data older than 15 minutes is stale
+                    if (minutesSinceSync > 15) {
+                        isStale = true;
+                        statusText = '<i class="fas fa-exclamation-triangle me-1"></i>Sync Data';
+                    }
+                } else {
+                    // After hours: data older than 4 hours is stale
+                    if (minutesSinceSync > 240) {
+                        isStale = true;
+                        statusText = '<i class="fas fa-clock me-1"></i>Sync Data';
+                    }
+                }
+                
+                // Set market status data attribute for CSS styling
+                navbarSyncButton.setAttribute('data-market', isMarketHours ? 'open' : 'closed');
+                
+                if (isStale) {
+                    navbarSyncButton.setAttribute('data-sync-status', 'stale');
+                    // Show warning status in global box
+                    const urgencyLevel = isMarketHours ? 'urgent' : 'normal';
+                    const warningMsg = isMarketHours ? 
+                        'Position data may be outdated during market hours' : 
+                        'Data sync recommended';
+                    showSyncStatus('warning', 'Data Update Recommended', `${warningMsg} (last sync: ${formatTimeSince(minutesSinceSync)})`);
+                } else if (minutesSinceSync < 5) {
+                    // Very fresh data (less than 5 minutes)
+                    navbarSyncButton.setAttribute('data-sync-status', 'synced');
+                } else if (isMarketHours && minutesSinceSync < 15) {
+                    // Fresh during market hours
+                    navbarSyncButton.setAttribute('data-sync-status', 'synced');
+                }
+                
+                // Add tooltip with more detailed timing info
+                const lastSyncText = formatTimeSince(minutesSinceSync);
+                const marketStatusText = isMarketHours ? '🟢 Markets Open' : '🔴 Markets Closed';
+                navbarSyncButton.title = `Last sync: ${lastSyncText}\n${marketStatusText}`;
+            } else {
+                // No sync yet
+                const isMarketHours = isMarketOpen(now);
+                navbarSyncButton.setAttribute('data-market', isMarketHours ? 'open' : 'closed');
+                const marketStatusText = isMarketHours ? '🟢 Markets Open' : '🔴 Markets Closed';
+                navbarSyncButton.title = `No data synced yet\n${marketStatusText}`;
+            }
+        }
+        
+        // Helper function to format time since last sync
+        function formatTimeSince(minutes) {
+            if (minutes < 1) {
+                return 'Just now';
+            } else if (minutes < 60) {
+                return `${Math.floor(minutes)} minute${Math.floor(minutes) !== 1 ? 's' : ''} ago`;
+            } else if (minutes < 1440) {
+                const hours = Math.floor(minutes / 60);
+                return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+            } else {
+                const days = Math.floor(minutes / 1440);
+                return `${days} day${days !== 1 ? 's' : ''} ago`;
+            }
+        }
+        
+        // Helper function to check if markets are open
+        function isMarketOpen(date) {
+            // Convert to Eastern Time (approximate - doesn't handle DST perfectly)
+            const etOffset = -5; // EST offset from UTC
+            const etTime = new Date(date.getTime() + (etOffset * 60 * 60 * 1000));
+            
+            const day = etTime.getDay(); // 0 = Sunday, 6 = Saturday
+            const hour = etTime.getHours();
+            const minute = etTime.getMinutes();
+            const timeInMinutes = hour * 60 + minute;
+            
+            // Market is closed on weekends
+            if (day === 0 || day === 6) {
+                return false;
+            }
+            
+            // Market hours: 9:30 AM - 4:00 PM ET
+            const marketOpen = 9 * 60 + 30; // 9:30 AM in minutes
+            const marketClose = 16 * 60; // 4:00 PM in minutes
+            
+            return timeInMinutes >= marketOpen && timeInMinutes < marketClose;
+        }
+    });
+    </script>
 </body>
 </html> 

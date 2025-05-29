@@ -80,6 +80,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.tastytrade.context_processors.tastytrade_credential',
             ],
         },
     },
@@ -146,6 +147,33 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# TastyTrade OAuth 2.0 Configuration
+TASTYTRADE_OAUTH_CLIENT_ID = env('TASTYTRADE_OAUTH_CLIENT_ID', default=None)
+TASTYTRADE_OAUTH_CLIENT_SECRET = env('TASTYTRADE_OAUTH_CLIENT_SECRET', default=None)  
+TASTYTRADE_OAUTH_REDIRECT_URI = env('TASTYTRADE_OAUTH_REDIRECT_URI', default='http://localhost:8000/tastytrade/oauth/callback/')
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'apps.tastytrade.tastytrade_api': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
 
 # Custom user model
 AUTH_USER_MODEL = 'accounts.User'
