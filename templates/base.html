@@ -36,15 +36,52 @@
                                 <li><a class="dropdown-item" href="/accounts/email/">Email Settings</a></li>
                             </ul>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/positions/">Positions</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="positionsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Positions
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="positionsDropdown">
+                                <li><a class="dropdown-item" href="/positions/">All Positions</a></li>
+                                {% if available_accounts %}
+                                    <li><hr class="dropdown-divider"></li>
+                                    {% for account in available_accounts %}
+                                        <li><a class="dropdown-item" href="/positions/{{ account }}/">Account {{ account }}</a></li>
+                                    {% endfor %}
+                                {% endif %}
+                            </ul>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/transactions/">Transactions</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="transactionsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Transactions
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="transactionsDropdown">
+                                <li><a class="dropdown-item" href="/transactions/">All Transactions</a></li>
+                                {% if available_accounts %}
+                                    <li><hr class="dropdown-divider"></li>
+                                    {% for account in available_accounts %}
+                                        <li><a class="dropdown-item" href="/transactions/{{ account }}/">Account {{ account }}</a></li>
+                                    {% endfor %}
+                                {% endif %}
+                            </ul>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="/reports/">Reports</a>
                         </li>
+                        {% if tastytrade_credential %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="settingsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Settings
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="settingsDropdown">
+                                <li><a class="dropdown-item" href="{% url 'tastytrade_settings' %}"><i class="fas fa-cog me-2"></i>Account Settings</a></li>
+                                <li><a class="dropdown-item" href="{% url 'tastytrade_account_preferences' %}"><i class="fas fa-sliders-h me-2"></i>Preferences</a></li>
+                                <li><a class="dropdown-item" href="{% url 'tastytrade_manage_tracked_accounts' %}"><i class="fas fa-list me-2"></i>Tracked Accounts</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'tastytrade_change_password' %}"><i class="fas fa-key me-2"></i>Change Password</a></li>
+                                <li><a class="dropdown-item text-danger" href="{% url 'tastytrade_delete_account' %}"><i class="fas fa-trash me-2"></i>Delete Account</a></li>
+                            </ul>
+                        </li>
+                        {% endif %}
                     </ul>
                     
                     <!-- Right-side actions -->

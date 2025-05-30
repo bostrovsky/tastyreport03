@@ -155,7 +155,10 @@
   <div class="col-12">
     <div class="tt-data-table-container">
       <div class="tt-data-table-header">
-        <h3 class="tt-heading-3 mb-0">Today's Activity</h3>
+        <h3 class="tt-heading-3 mb-0">Recent Activity</h3>
+        {% if recent_transactions_date_range %}
+          <small class="text-muted d-block">{{ recent_transactions_date_range }}</small>
+        {% endif %}
         <div class="tt-data-table-actions">
           {% if has_recent_activity %}
             <a href="/transactions/" class="btn btn-sm btn-outline-primary">View All</a>
@@ -180,7 +183,7 @@
               {% for transaction in todays_transactions %}
                 <tr>
                   <td class="text-muted small">
-                    {{ transaction.trade_date|date:"H:i" }}
+                    {{ transaction.trade_date|date:"m/d H:i" }}
                   </td>
                   <td>
                     <span class="badge bg-{% if transaction.transaction_type == 'trade' %}primary{% elif transaction.transaction_type == 'dividend' %}success{% elif transaction.transaction_type == 'fee' %}warning{% else %}secondary{% endif %}">
@@ -226,13 +229,13 @@
             <div class="mb-3">
               <i class="fas fa-calendar-day text-muted" style="font-size: 2rem;"></i>
             </div>
-            <p class="tt-text-secondary mb-2">No trades today</p>
-            <p class="small text-muted">Your trading activity from today will appear here after you make trades.</p>
+            <p class="tt-text-secondary mb-2">No recent trades</p>
+            <p class="small text-muted">Your recent trading activity will appear here after you make trades.</p>
           {% else %}
             <div class="mb-3">
               <i class="fas fa-sync-alt text-muted" style="font-size: 2rem;"></i>
             </div>
-            <p class="tt-text-secondary mb-2">Sync your data to see today's activity</p>
+            <p class="tt-text-secondary mb-2">Sync your data to see recent activity</p>
             <p class="small text-muted">Your recent trading activity will appear here after syncing your data.</p>
           {% endif %}
         </div>

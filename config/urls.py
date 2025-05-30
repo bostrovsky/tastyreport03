@@ -22,7 +22,9 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', dashboard, name='home'),
     path('positions/', positions, name='positions'),
+    path('positions/<str:account_number>/', positions, name='positions_account'),
     path('transactions/', transactions, name='transactions'),
+    path('transactions/<str:account_number>/', transactions, name='transactions_account'),
     path('accounts/', include('allauth.urls')),
     path('tastytrade/', include('apps.tastytrade.urls')),
 ]

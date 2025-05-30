@@ -96,3 +96,62 @@ class Transaction(models.Model):
 
     def __str__(self):
         return f"{self.transaction_type} {self.symbol} {self.amount} on {self.trade_date}"
+
+
+class UserAccountPreferences(models.Model):
+    """User preferences for TastyTrade account management"""
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='tastytrade_preferences')
+    credential = models.ForeignKey('TastyTradeCredential', on_delete=models.CASCADE)
+    
+    # Account tracking preferences
+    tracked_accounts = models.JSONField(default=list, help_text="List of account numbers to sync and track")
+    save_credentials = models.BooleanField(default=True, help_text="Whether to save TastyTrade credentials")
+    
+    # Sync preferences
+    auto_sync_frequency = models.CharField(
+        max_length=20, 
+        choices=[
+            ('manual', 'Manual Only'),
+            ('daily', 'Daily'),
+            ('hourly', 'Hourly'),
+        ],
+        default='manual'
+    )
+    
+    # Data retention preferences
+    keep_historical_data_on_account_removal = models.BooleanField(
+        default=True, 
+        help_text="Keep historical data when removing an account from tracking"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Preferences for {self.user.username}"
+
+
+class DiscoveredAccount(models.Model):
+    """Track discovered TastyTrade accounts and user's choice to include them"""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    credential = models.ForeignKey('TastyTradeCredential', on_delete=models.CASCADE)
+    account_number = models.CharField(max_length=32)
+    
+    # Account status
+    is_tracked = models.BooleanField(default=False, help_text="Whether user chose to track this account")
+    discovered_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(auto_now=True)
+    
+    # Account metadata
+    account_type = models.CharField(max_length=50, blank=True, help_text="IRA, Individual, etc.")
+    account_name = models.CharField(max_length=100, blank=True, help_text="User-friendly name")
+    
+    class Meta:
+        unique_together = ('user', 'credential', 'account_number')
+        indexes = [
+            models.Index(fields=['user', 'credential', 'is_tracked']),
+        ]
+    
+    def __str__(self):
+        status = "Tracked" if self.is_tracked else "Not Tracked"
+        return f"Account {self.account_number} ({status})"

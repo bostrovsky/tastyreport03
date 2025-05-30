@@ -7,8 +7,14 @@
     <!-- Page Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h1 class="h3 mb-1">📈 Transaction History</h1>
+            <h1 class="h3 mb-1">📈 {{ page_title|default:"Transaction History" }}</h1>
             <p class="text-muted">Complete trading history with search and filters</p>
+            {% if current_account %}
+                <div class="mb-3">
+                    <span class="badge bg-primary">Account {{ current_account }}</span>
+                    <a href="{% url 'transactions' %}" class="btn btn-sm btn-outline-secondary ms-2">View All Accounts</a>
+                </div>
+            {% endif %}
         </div>
         {% if tastytrade_credential %}
             <div class="d-flex align-items-center gap-3">

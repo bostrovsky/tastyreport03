@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block title %}TastyTrade Settings{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-4">TastyTrade Settings</h1>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Account Overview</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-sm-6">
+                            <strong>Username:</strong>
+                        </div>
+                        <div class="col-sm-6">
+                            {{ credential.username }}
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-6">
+                            <strong>Connected Since:</strong>
+                        </div>
+                        <div class="col-sm-6">
+                            {{ credential.created_at|date:"M j, Y" }}
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-6">
+                            <strong>Tracked Accounts:</strong>
+                        </div>
+                        <div class="col-sm-6">
+                            {{ tracked_count }} of {{ total_accounts }}
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-6">
+                            <strong>Save Credentials:</strong>
+                        </div>
+                        <div class="col-sm-6">
+                            {% if preferences.save_credentials %}
+                                <span class="badge bg-success">Enabled</span>
+                            {% else %}
+                                <span class="badge bg-warning">Disabled</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'tastytrade_account_preferences' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-cog me-2"></i>Account Preferences
+                        </a>
+                        <a href="{% url 'tastytrade_manage_tracked_accounts' %}" class="btn btn-outline-info">
+                            <i class="fas fa-list me-2"></i>Manage Tracked Accounts
+                        </a>
+                        <a href="{% url 'tastytrade_change_password' %}" class="btn btn-outline-warning">
+                            <i class="fas fa-key me-2"></i>Change Password
+                        </a>
+                        <a href="{% url 'tastytrade_delete_account' %}" class="btn btn-outline-danger">
+                            <i class="fas fa-trash me-2"></i>Delete Account
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="row">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

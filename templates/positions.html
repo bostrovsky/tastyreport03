@@ -7,8 +7,14 @@
     <!-- Page Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h1 class="h3 mb-1">📊 Current Positions</h1>
+            <h1 class="h3 mb-1">📊 {{ page_title|default:"Current Positions" }}</h1>
             <p class="text-muted">Your current holdings with real-time P&L and Greeks</p>
+            {% if current_account %}
+                <div class="mb-3">
+                    <span class="badge bg-primary">Account {{ current_account }}</span>
+                    <a href="{% url 'positions' %}" class="btn btn-sm btn-outline-secondary ms-2">View All Accounts</a>
+                </div>
+            {% endif %}
         </div>
         {% if tastytrade_credential %}
             <div class="d-flex align-items-center gap-3">
@@ -39,99 +45,202 @@
             </div>
         </div>
     {% else %}
-        <!-- Portfolio Summary Cards -->
+        <!-- Portfolio Statistics -->
         <div class="row mb-4">
-            <div class="col-md-2">
-                <div class="tt-stat-card">
-                    <div class="tt-stat-card-header">
-                        <div class="tt-stat-card-title">Total Positions</div>
-                        <div class="tt-stat-card-icon">📊</div>
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">📊 Portfolio Statistics</h5>
+                        <small class="text-muted">Securities value only (excludes cash balances)</small>
                     </div>
-                    <div class="tt-stat-card-value">{{ total_positions }}</div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <div class="d-flex align-items-center justify-content-center">
+                                    <strong class="me-2">Total Positions:</strong>
+                                    <span class="h4 mb-0 text-primary">{{ total_positions }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="d-flex align-items-center justify-content-center">
+                                    <strong class="me-2">Portfolio Value:</strong>
+                                    <span class="h4 mb-0 text-success">${{ total_market_value|floatformat:0 }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="d-flex align-items-center justify-content-center">
+                                    <strong class="me-2">Portfolio Delta:</strong>
+                                    <span class="h4 mb-0">
+                                        {% if total_delta %}
+                                            {% if total_delta > 0 %}
+                                                <span class="text-success">+{{ total_delta|floatformat:1 }}</span>
+                                            {% elif total_delta < 0 %}
+                                                <span class="text-danger">{{ total_delta|floatformat:1 }}</span>
+                                            {% else %}
+                                                <span class="text-muted">0.0</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="d-flex align-items-center justify-content-center">
+                                    <strong class="me-2">Portfolio Theta:</strong>
+                                    <span class="h4 mb-0">
+                                        {% if total_theta %}
+                                            {% if total_theta > 0 %}
+                                                <span class="text-success">+{{ total_theta|floatformat:1 }}</span>
+                                            {% elif total_theta < 0 %}
+                                                <span class="text-danger">{{ total_theta|floatformat:1 }}</span>
+                                            {% else %}
+                                                <span class="text-muted">0.0</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="col-md-2">
-                <div class="tt-stat-card">
-                    <div class="tt-stat-card-header">
-                        <div class="tt-stat-card-title">Portfolio Value</div>
-                        <div class="tt-stat-card-icon">💰</div>
-                    </div>
-                    <div class="tt-stat-card-value">${{ total_market_value|floatformat:2 }}</div>
+        </div>
+
+        <!-- Portfolio Allocation & Risk Analysis -->
+        <div class="mb-4 portfolio-allocation-grid">
+            <!-- Portfolio Value Allocation -->
+            <div class="card h-100">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">Portfolio Value Allocation</h6>
                 </div>
-            </div>
-            <div class="col-md-2">
-                <div class="tt-stat-card">
-                    <div class="tt-stat-card-header">
-                        <div class="tt-stat-card-title">Total Delta</div>
-                        <div class="tt-stat-card-icon">Δ</div>
-                    </div>
-                    <div class="tt-stat-card-value">
-                        {% if total_delta %}
-                            {% if total_delta > 0 %}
-                                <span class="tt-positive">+{{ total_delta|floatformat:2 }}</span>
-                            {% elif total_delta < 0 %}
-                                <span class="tt-negative">{{ total_delta|floatformat:2 }}</span>
+                <div class="card-body">
+                    <div class="d-flex align-items-start">
+                        <!-- Chart -->
+                        <div class="flex-shrink-0 me-3">
+                            {% if portfolio_allocation %}
+                            <div style="position: relative; height: 200px; width: 200px;">
+                                <canvas id="portfolioChart" width="200" height="200"></canvas>
+                            </div>
                             {% else %}
-                                0.00
+                            <div class="text-center text-muted" style="width: 200px; height: 200px; display: flex; flex-direction: column; justify-content: center;">
+                                <i class="fas fa-chart-pie fa-2x mb-2"></i>
+                                <div>No positions</div>
+                            </div>
                             {% endif %}
-                        {% else %}
-                            —
-                        {% endif %}
+                        </div>
+                        
+                        <!-- Holdings List -->
+                        <div class="flex-grow-1">
+                            {% if portfolio_allocation %}
+                            <h6 class="text-muted mb-2 small">Top Holdings</h6>
+                            <div style="max-height: 180px; overflow-y: auto;">
+                                {% for allocation in portfolio_allocation %}
+                                    {% if forloop.counter <= 6 %}
+                                    <div class="d-flex align-items-center justify-content-between p-1 mb-1 border rounded small">
+                                        <div>
+                                            <div class="fw-bold text-primary">{{ allocation.symbol }}</div>
+                                            <div class="text-muted small">${{ allocation.value|floatformat:0 }}</div>
+                                        </div>
+                                        <div class="badge bg-primary small">{{ allocation.percentage }}%</div>
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-2">
-                <div class="tt-stat-card">
-                    <div class="tt-stat-card-header">
-                        <div class="tt-stat-card-title">Total Theta</div>
-                        <div class="tt-stat-card-icon">Θ</div>
-                    </div>
-                    <div class="tt-stat-card-value">
-                        {% if total_theta %}
-                            {% if total_theta > 0 %}
-                                <span class="tt-positive">+{{ total_theta|floatformat:2 }}</span>
-                            {% elif total_theta < 0 %}
-                                <span class="tt-negative">{{ total_theta|floatformat:2 }}</span>
+            
+            <!-- Delta Risk Allocation -->
+            <div class="card h-100">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">Delta Risk Allocation</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-start">
+                        <!-- Chart -->
+                        <div class="flex-shrink-0 me-3">
+                            {% if delta_risk_allocation %}
+                            <div style="position: relative; height: 200px; width: 200px;">
+                                <canvas id="deltaChart" width="200" height="200"></canvas>
+                            </div>
                             {% else %}
-                                0.00
+                            <div class="text-center text-muted" style="width: 200px; height: 200px; display: flex; flex-direction: column; justify-content: center;">
+                                <i class="fas fa-chart-pie fa-2x mb-2"></i>
+                                <div>No delta data</div>
+                            </div>
                             {% endif %}
-                        {% else %}
-                            —
-                        {% endif %}
+                        </div>
+                        
+                        <!-- Risk List -->
+                        <div class="flex-grow-1">
+                            {% if delta_risk_allocation %}
+                            <h6 class="text-muted mb-2 small">Top Risk Contributors</h6>
+                            <div style="max-height: 180px; overflow-y: auto;">
+                                {% for risk in delta_risk_allocation %}
+                                    {% if forloop.counter <= 6 %}
+                                    <div class="d-flex align-items-center justify-content-between p-1 mb-1 border rounded small">
+                                        <div>
+                                            <div class="fw-bold text-warning">{{ risk.symbol }}</div>
+                                            <div class="text-muted small">Δ {{ risk.value|floatformat:1 }}</div>
+                                        </div>
+                                        <div class="badge bg-warning small">{{ risk.percentage }}%</div>
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-2">
-                <div class="tt-stat-card">
-                    <div class="tt-stat-card-header">
-                        <div class="tt-stat-card-title">Unrealized P&L</div>
-                        <div class="tt-stat-card-icon">📈</div>
+        </div>
+
+        <!-- P&L Statistics -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">📈 Profit & Loss</h5>
+                        <small class="text-muted">Current period P&L (daily, monthly, YTD expansion planned)</small>
                     </div>
-                    <div class="tt-stat-card-value">
-                        {% if total_unrealized_pnl > 0 %}
-                            <span class="tt-positive">+${{ total_unrealized_pnl|floatformat:2 }}</span>
-                        {% elif total_unrealized_pnl < 0 %}
-                            <span class="tt-negative">${{ total_unrealized_pnl|floatformat:2 }}</span>
-                        {% else %}
-                            $0.00
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="tt-stat-card">
-                    <div class="tt-stat-card-header">
-                        <div class="tt-stat-card-title">Realized P&L</div>
-                        <div class="tt-stat-card-icon">✅</div>
-                    </div>
-                    <div class="tt-stat-card-value">
-                        {% if total_realized_pnl > 0 %}
-                            <span class="tt-positive">+${{ total_realized_pnl|floatformat:2 }}</span>
-                        {% elif total_realized_pnl < 0 %}
-                            <span class="tt-negative">${{ total_realized_pnl|floatformat:2 }}</span>
-                        {% else %}
-                            $0.00
-                        {% endif %}
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-6">
+                                <div class="border-end">
+                                    <div class="h4 mb-1">
+                                        {% if total_unrealized_pnl > 0 %}
+                                            <span class="text-success">+${{ total_unrealized_pnl|floatformat:2 }}</span>
+                                        {% elif total_unrealized_pnl < 0 %}
+                                            <span class="text-danger">${{ total_unrealized_pnl|floatformat:2 }}</span>
+                                        {% else %}
+                                            $0.00
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-muted small">Unrealized P&L</div>
+                                    <div class="text-muted small">Open positions value change</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div>
+                                    <div class="h4 mb-1">
+                                        {% if total_realized_pnl > 0 %}
+                                            <span class="text-success">+${{ total_realized_pnl|floatformat:2 }}</span>
+                                        {% elif total_realized_pnl < 0 %}
+                                            <span class="text-danger">${{ total_realized_pnl|floatformat:2 }}</span>
+                                        {% else %}
+                                            $0.00
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-muted small">Realized P&L</div>
+                                    <div class="text-muted small">Closed positions profit/loss</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -218,14 +327,14 @@
                                     </td>
                                     <td class="text-end">
                                         {% if position.delta %}
-                                            {{ position.delta|floatformat:3 }}
+                                            {{ position.delta|floatformat:2 }}
                                         {% else %}
                                             —
                                         {% endif %}
                                     </td>
                                     <td class="text-end">
                                         {% if position.theta %}
-                                            {{ position.theta|floatformat:3 }}
+                                            {{ position.theta|floatformat:2 }}
                                         {% else %}
                                             —
                                         {% endif %}
@@ -269,6 +378,19 @@
 </div>
 
 <style>
+.portfolio-allocation-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+@media (max-width: 768px) {
+    .portfolio-allocation-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+}
+
 .badge-asset-equity {
     background-color: #3b82f6;
     color: white;
@@ -301,4 +423,170 @@
     font-weight: 500;
 }
 </style>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+{% if portfolio_allocation %}
+{{ portfolio_allocation|json_script:"portfolio-data" }}
+{% endif %}
+{% if delta_risk_allocation %}
+{{ delta_risk_allocation|json_script:"delta-data" }}
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Portfolio Value Chart
+    {% if portfolio_allocation %}
+    const portfolioCtx = document.getElementById('portfolioChart').getContext('2d');
+    const portfolioData = JSON.parse(document.getElementById('portfolio-data').textContent);
+    
+    // Generate consistent colors - use gray for "Other"
+    const colors = [
+        '#3b82f6', // Blue
+        '#10b981', // Green  
+        '#f59e0b', // Amber
+        '#ef4444', // Red
+        '#8b5cf6', // Purple
+        '#06b6d4', // Cyan
+        '#84cc16', // Lime
+        '#f97316', // Orange
+        '#ec4899', // Pink
+        '#94a3b8'  // Light Gray for others
+    ];
+    
+    // Assign colors, with special handling for "Other"
+    const chartColors = portfolioData.map((item, index) => {
+        if (item.symbol === 'Other') {
+            return '#9ca3af'; // Gray for "Other" segment
+        }
+        return colors[index % colors.length];
+    });
+    
+    const chartData = {
+        labels: portfolioData.map(item => item.symbol),
+        datasets: [{
+            data: portfolioData.map(item => item.percentage),
+            backgroundColor: chartColors,
+            borderColor: '#ffffff',
+            borderWidth: 2,
+            hoverBorderWidth: 3
+        }]
+    };
+    
+    const portfolioConfig = {
+        type: 'doughnut',
+        data: chartData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false  // We show legend separately in the left card
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const symbol = context.label;
+                            const percentage = context.parsed;
+                            const value = portfolioData[context.dataIndex].value;
+                            return `${symbol}: ${percentage}% ($${value.toLocaleString()})`;
+                        }
+                    },
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: '#ffffff',
+                    bodyColor: '#ffffff',
+                    borderColor: '#374151',
+                    borderWidth: 1
+                }
+            },
+            cutout: '60%',  // Creates doughnut hole
+            elements: {
+                arc: {
+                    borderRadius: 4
+                }
+            }
+        }
+    };
+    
+    new Chart(portfolioCtx, portfolioConfig);
+{% endif %}
+    
+    // Delta Risk Chart
+{% if delta_risk_allocation %}
+    const deltaCtx = document.getElementById('deltaChart').getContext('2d');
+    const deltaData = JSON.parse(document.getElementById('delta-data').textContent);
+    
+    // Risk-focused colors - warmer palette for risk
+    const riskColors = [
+        '#dc2626', // Red
+        '#ea580c', // Orange
+        '#d97706', // Amber
+        '#ca8a04', // Yellow
+        '#65a30d', // Lime
+        '#059669', // Emerald
+        '#0d9488', // Teal
+        '#0891b2', // Sky
+        '#3730a3', // Indigo
+        '#9333ea'  // Purple
+    ];
+    
+    // Assign colors for delta chart
+    const deltaChartColors = deltaData.map((item, index) => {
+        if (item.symbol === 'Other') {
+            return '#9ca3af'; // Gray for "Other" segment
+        }
+        return riskColors[index % riskColors.length];
+    });
+    
+    const deltaChartData = {
+        labels: deltaData.map(item => item.symbol),
+        datasets: [{
+            data: deltaData.map(item => item.percentage),
+            backgroundColor: deltaChartColors,
+            borderColor: '#ffffff',
+            borderWidth: 2,
+            hoverBorderWidth: 3
+        }]
+    };
+    
+    const deltaConfig = {
+        type: 'doughnut',
+        data: deltaChartData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const symbol = context.label;
+                            const percentage = context.parsed;
+                            const delta = deltaData[context.dataIndex].value;
+                            return `${symbol}: ${percentage}% (Δ ${delta.toFixed(1)})`;
+                        }
+                    },
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: '#ffffff',
+                    bodyColor: '#ffffff',
+                    borderColor: '#374151',
+                    borderWidth: 1
+                }
+            },
+            cutout: '60%',
+            elements: {
+                arc: {
+                    borderRadius: 4
+                }
+            }
+        }
+    };
+    
+    new Chart(deltaCtx, deltaConfig);
+{% endif %}
+});
+</script>
 {% endblock %}

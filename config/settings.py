@@ -81,6 +81,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'apps.tastytrade.context_processors.tastytrade_credential',
+                'apps.tastytrade.context_processors.tastytrade_accounts',
             ],
         },
     },

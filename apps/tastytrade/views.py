@@ -2,8 +2,11 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.urls import reverse
-from apps.tastytrade.models import TastyTradeCredential, Position, Transaction
-from apps.tastytrade.forms import TastyTradeCredentialForm
+from apps.tastytrade.models import TastyTradeCredential, Position, Transaction, UserAccountPreferences, DiscoveredAccount
+from apps.tastytrade.forms import (
+    TastyTradeCredentialForm, AccountPreferencesForm, TrackedAccountsForm, 
+    TastyTradePasswordChangeForm, DeleteAccountConfirmationForm
+)
 from django.utils import timezone
 from django.contrib import messages
 from django.db import transaction as db_transaction
@@ -238,18 +241,35 @@ def dashboard(request):
         credential = request.user.tastytrade_credential
         context['tastytrade_credential'] = credential
         
-        # Get today's transactions (limit to 10 most recent)
-        from datetime import date
-        today = date.today()
+        # Get accounts for P&L calculations (available_accounts now from context processor)
+        accounts = Position.objects.filter(
+            user=request.user, 
+            credential=credential
+        ).values_list('tastytrade_account_number', flat=True).distinct()
         
+        # Get recent transactions (yesterday and today - from previous market close)
+        from datetime import date, timedelta
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        
+        # Recent activity includes yesterday and today (previous close through today)
+        recent_transactions = Transaction.objects.filter(
+            user=request.user,
+            credential=credential,
+            trade_date__date__gte=yesterday  # Yesterday and today
+        ).order_by('-trade_date', '-created_at')[:10]
+        
+        # Also get just today's transactions for P&L calculation
         todays_transactions = Transaction.objects.filter(
             user=request.user,
             credential=credential,
             trade_date__date=today
-        ).order_by('-trade_date')[:10]
+        ).order_by('-trade_date')
         
-        context['todays_transactions'] = todays_transactions
-        context['has_recent_activity'] = todays_transactions.exists()
+        context['todays_transactions'] = recent_transactions  # Show recent for display
+        context['has_recent_activity'] = recent_transactions.exists()
+        context['todays_transactions_count'] = todays_transactions.count()
+        context['recent_transactions_date_range'] = f"{yesterday.strftime('%m/%d')} - {today.strftime('%m/%d')}"
         
         # Get summary statistics
         total_positions = Position.objects.filter(user=request.user, credential=credential).count()
@@ -280,6 +300,38 @@ def dashboard(request):
         
         # Calculate total daily P&L (realized + daily unrealized change)
         context['todays_total_pnl'] = todays_realized_pnl + daily_unrealized_pnl
+        
+        # Calculate per-account statistics for dashboard
+        account_stats = {}
+        for account in accounts:
+            account_positions = positions.filter(tastytrade_account_number=account)
+            account_transactions = todays_transactions.filter(tastytrade_account_number=account)
+            
+            account_portfolio_stats = account_positions.aggregate(
+                market_value=models.Sum('market_value'),
+                unrealized_pnl=models.Sum('unrealized_pnl'),
+                daily_unrealized=models.Sum('daily_unrealized_pnl'),
+                delta=models.Sum('delta'),
+                theta=models.Sum('theta'),
+            )
+            
+            account_realized_pnl = account_transactions.aggregate(
+                total_pnl=models.Sum('amount')
+            )['total_pnl'] or 0
+            
+            account_stats[account] = {
+                'positions_count': account_positions.count(),
+                'market_value': account_portfolio_stats['market_value'] or 0,
+                'unrealized_pnl': account_portfolio_stats['unrealized_pnl'] or 0,
+                'daily_unrealized_pnl': account_portfolio_stats['daily_unrealized'] or 0,
+                'realized_pnl_today': account_realized_pnl,
+                'total_daily_pnl': account_realized_pnl + (account_portfolio_stats['daily_unrealized'] or 0),
+                'delta': account_portfolio_stats['delta'],
+                'theta': account_portfolio_stats['theta'],
+                'transactions_today': account_transactions.count(),
+            }
+        
+        context['account_stats'] = account_stats
         
     except TastyTradeCredential.DoesNotExist:
         context['tastytrade_credential'] = None
@@ -381,19 +433,26 @@ def revoke_oauth(request):
     return redirect('tastytrade_connect')
 
 @login_required
-def positions(request):
-    """View current positions with P&L and Greeks"""
+def positions(request, account_number=None):
+    """View current positions with P&L and Greeks, optionally filtered by account"""
     context = {}
     
     try:
         credential = request.user.tastytrade_credential
         context['tastytrade_credential'] = credential
         
-        # Get all positions for the user, grouped by account
-        all_positions = Position.objects.filter(
-            user=request.user, 
-            credential=credential
-        ).order_by('tastytrade_account_number', '-market_value')
+        # Set current account for filtering display (available_accounts from context processor)
+        context['current_account'] = account_number
+        
+        # Filter positions by account if specified
+        position_filter = {
+            'user': request.user,
+            'credential': credential
+        }
+        if account_number:
+            position_filter['tastytrade_account_number'] = account_number
+        
+        all_positions = Position.objects.filter(**position_filter).order_by('tastytrade_account_number', '-market_value')
         
         # Group positions by account
         positions_by_account = {}
@@ -407,7 +466,7 @@ def positions(request):
         context['positions'] = all_positions  # Keep for backwards compatibility
         context['total_positions'] = all_positions.count()
         
-        # Calculate total portfolio value, P&L, and Greeks
+        # Calculate portfolio value, P&L, and Greeks for displayed positions
         from django.db import models
         portfolio_stats = all_positions.aggregate(
             total_market_value=models.Sum('market_value'),
@@ -425,6 +484,106 @@ def positions(request):
             'total_theta': portfolio_stats['total_theta'],
         })
         
+        # Calculate portfolio allocation by symbol for pie chart
+        total_value = context['total_market_value']
+        if total_value > 0:
+            symbol_allocations = []
+            symbol_values = {}
+            
+            # Group by symbol and sum market values
+            for position in all_positions:
+                symbol = position.symbol
+                value = position.market_value or 0
+                if symbol in symbol_values:
+                    symbol_values[symbol] += value
+                else:
+                    symbol_values[symbol] = value
+            
+            # Calculate percentages and format for chart
+            top_holdings = []
+            other_value = 0
+            
+            # Sort by value descending first
+            sorted_symbols = sorted(symbol_values.items(), key=lambda x: x[1], reverse=True)
+            
+            for symbol, value in sorted_symbols:
+                percentage = (value / total_value) * 100
+                if percentage >= 3 and len(top_holdings) < 8:  # Show top 8 holdings with at least 3%
+                    top_holdings.append({
+                        'symbol': symbol,
+                        'value': float(value),
+                        'percentage': round(percentage, 1)
+                    })
+                else:
+                    other_value += value
+            
+            # Add "Other" segment if there are remaining holdings
+            if other_value > 0:
+                other_percentage = (other_value / total_value) * 100
+                top_holdings.append({
+                    'symbol': 'Other',
+                    'value': float(other_value),
+                    'percentage': round(other_percentage, 1)
+                })
+            
+            context['portfolio_allocation'] = top_holdings
+            
+            # Calculate delta risk allocation by symbol for risk chart
+            delta_allocations = []
+            symbol_deltas = {}
+            total_abs_delta = 0
+            
+            # Group by symbol and sum absolute deltas
+            for position in all_positions:
+                if position.delta:
+                    symbol = position.symbol
+                    delta = abs(float(position.delta))
+                    total_abs_delta += delta
+                    if symbol in symbol_deltas:
+                        symbol_deltas[symbol] += delta
+                    else:
+                        symbol_deltas[symbol] = delta
+            
+            if total_abs_delta > 0:
+                top_delta_risks = []
+                other_delta = 0
+                
+                # Sort by absolute delta descending
+                sorted_deltas = sorted(symbol_deltas.items(), key=lambda x: x[1], reverse=True)
+                
+                for symbol, delta in sorted_deltas:
+                    percentage = (delta / total_abs_delta) * 100
+                    if percentage >= 3 and len(top_delta_risks) < 8:  # Show top 8 delta risks with at least 3%
+                        top_delta_risks.append({
+                            'symbol': symbol,
+                            'value': float(delta),
+                            'percentage': round(percentage, 1)
+                        })
+                    else:
+                        other_delta += delta
+                
+                # Add "Other" segment if there are remaining deltas
+                if other_delta > 0:
+                    other_percentage = (other_delta / total_abs_delta) * 100
+                    top_delta_risks.append({
+                        'symbol': 'Other',
+                        'value': float(other_delta),
+                        'percentage': round(other_percentage, 1)
+                    })
+                
+                context['delta_risk_allocation'] = top_delta_risks
+            else:
+                context['delta_risk_allocation'] = []
+        else:
+            context['portfolio_allocation'] = []
+            context['delta_risk_allocation'] = []
+        
+        # Add account-specific title
+        if account_number:
+            context['page_title'] = f'Positions - Account {account_number}'
+        else:
+            context['page_title'] = 'All Positions'
+        
     except TastyTradeCredential.DoesNotExist:
         context['tastytrade_credential'] = None
         context['positions'] = []
@@ -434,23 +593,32 @@ def positions(request):
         context['total_realized_pnl'] = 0
         context['total_delta'] = None
         context['total_theta'] = None
+        context['current_account'] = None
+        context['page_title'] = 'Positions'
     
     return render(request, "positions.html", context)
 
 @login_required  
-def transactions(request):
-    """View transaction history with filters and search"""
+def transactions(request, account_number=None):
+    """View transaction history with filters and search, optionally filtered by account"""
     context = {}
     
     try:
         credential = request.user.tastytrade_credential
         context['tastytrade_credential'] = credential
         
-        # Get all transactions for the user
-        transactions = Transaction.objects.filter(
-            user=request.user,
-            credential=credential
-        ).order_by('-trade_date')
+        # Set current account for filtering display (available_accounts from context processor)
+        context['current_account'] = account_number
+        
+        # Filter transactions by account if specified
+        transaction_filter = {
+            'user': request.user,
+            'credential': credential
+        }
+        if account_number:
+            transaction_filter['tastytrade_account_number'] = account_number
+        
+        transactions = Transaction.objects.filter(**transaction_filter).order_by('-trade_date')
         
         # Apply search filter if provided
         search_query = request.GET.get('search', '').strip()
@@ -498,6 +666,12 @@ def transactions(request):
             'avg_amount': summary_stats['avg_amount'] or 0,
         })
         
+        # Add account-specific title
+        if account_number:
+            context['page_title'] = f'Transactions - Account {account_number}'
+        else:
+            context['page_title'] = 'All Transactions'
+        
     except TastyTradeCredential.DoesNotExist:
         context['tastytrade_credential'] = None
         context['transactions'] = []
@@ -505,5 +679,230 @@ def transactions(request):
         context['transaction_types'] = []
         context['total_amount'] = 0
         context['avg_amount'] = 0
+        context['current_account'] = None
+        context['page_title'] = 'Transactions'
     
     return render(request, "transactions.html", context)
+
+
+@login_required
+def settings(request):
+    """Main settings page"""
+    context = {}
+    
+    try:
+        credential = request.user.tastytrade_credential
+        context['tastytrade_credential'] = credential
+        
+        # Get or create user preferences
+        preferences, created = UserAccountPreferences.objects.get_or_create(
+            user=request.user,
+            credential=credential,
+            defaults={
+                'tracked_accounts': [],
+                'save_credentials': True,
+                'auto_sync_frequency': 'manual',
+                'keep_historical_data_on_account_removal': True,
+            }
+        )
+        context['preferences'] = preferences
+        
+        # Get discovered accounts
+        discovered_accounts = DiscoveredAccount.objects.filter(
+            user=request.user,
+            credential=credential
+        ).order_by('account_number')
+        context['discovered_accounts'] = discovered_accounts
+        
+        # Get account statistics
+        account_stats = {}
+        for account in discovered_accounts:
+            if account.is_tracked:
+                positions_count = Position.objects.filter(
+                    user=request.user,
+                    credential=credential,
+                    tastytrade_account_number=account.account_number
+                ).count()
+                
+                transactions_count = Transaction.objects.filter(
+                    user=request.user,
+                    credential=credential,
+                    tastytrade_account_number=account.account_number
+                ).count()
+                
+                account_stats[account.account_number] = {
+                    'positions': positions_count,
+                    'transactions': transactions_count,
+                }
+        
+        context['account_stats'] = account_stats
+        
+    except TastyTradeCredential.DoesNotExist:
+        context['tastytrade_credential'] = None
+        context['preferences'] = None
+        context['discovered_accounts'] = []
+        context['account_stats'] = {}
+    
+    return render(request, "tastytrade/settings.html", context)
+
+
+@login_required
+def account_preferences(request):
+    """Manage account preferences"""
+    try:
+        credential = request.user.tastytrade_credential
+        preferences, created = UserAccountPreferences.objects.get_or_create(
+            user=request.user,
+            credential=credential
+        )
+    except TastyTradeCredential.DoesNotExist:
+        messages.error(request, "Please connect your TastyTrade account first.")
+        return redirect('tastytrade_connect')
+    
+    if request.method == 'POST':
+        form = AccountPreferencesForm(
+            request.POST,
+            instance=preferences,
+            user=request.user,
+            credential=credential
+        )
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Account preferences updated successfully.")
+            return redirect('settings')
+    else:
+        form = AccountPreferencesForm(
+            instance=preferences,
+            user=request.user,
+            credential=credential
+        )
+    
+    return render(request, "tastytrade/account_preferences.html", {'form': form})
+
+
+@login_required
+def manage_tracked_accounts(request):
+    """Manage which accounts to track"""
+    try:
+        credential = request.user.tastytrade_credential
+    except TastyTradeCredential.DoesNotExist:
+        messages.error(request, "Please connect your TastyTrade account first.")
+        return redirect('tastytrade_connect')
+    
+    if request.method == 'POST':
+        form = TrackedAccountsForm(
+            request.POST,
+            user=request.user,
+            credential=credential
+        )
+        if form.is_valid():
+            # Update tracked status for each account
+            discovered_accounts = DiscoveredAccount.objects.filter(
+                user=request.user,
+                credential=credential
+            )
+            
+            for account in discovered_accounts:
+                field_name = f'account_{account.account_number}'
+                name_field = f'name_{account.account_number}'
+                
+                if field_name in form.cleaned_data:
+                    account.is_tracked = form.cleaned_data[field_name]
+                    
+                if name_field in form.cleaned_data and form.cleaned_data[name_field]:
+                    account.account_name = form.cleaned_data[name_field]
+                    
+                account.save()
+            
+            messages.success(request, "Account tracking preferences updated.")
+            return redirect('settings')
+    else:
+        form = TrackedAccountsForm(
+            user=request.user,
+            credential=credential
+        )
+    
+    return render(request, "tastytrade/manage_tracked_accounts.html", {'form': form})
+
+
+@login_required  
+def change_tastytrade_password(request):
+    """Change TastyTrade password"""
+    try:
+        credential = request.user.tastytrade_credential
+    except TastyTradeCredential.DoesNotExist:
+        messages.error(request, "Please connect your TastyTrade account first.")
+        return redirect('tastytrade_connect')
+    
+    if request.method == 'POST':
+        form = TastyTradePasswordChangeForm(request.POST)
+        if form.is_valid():
+            # Verify current password by testing authentication
+            from .tastytrade_api import TastyTradeAPI
+            test_credential = TastyTradeCredential(
+                user=request.user,
+                environment=credential.environment,
+                username=credential.username,
+                password=form.cleaned_data['current_password']
+            )
+            
+            api = TastyTradeAPI(test_credential)
+            try:
+                api.authenticate()
+                # If authentication succeeds, update the password
+                credential.password = form.cleaned_data['new_password']
+                credential.save()
+                messages.success(request, "TastyTrade password updated successfully.")
+                return redirect('settings')
+            except Exception as e:
+                form.add_error('current_password', 'Current password is incorrect.')
+    else:
+        form = TastyTradePasswordChangeForm()
+    
+    return render(request, "tastytrade/change_tastytrade_password.html", {'form': form})
+
+
+@login_required
+def delete_account(request):
+    """Delete TastyTrade Tracker account"""
+    try:
+        credential = request.user.tastytrade_credential
+    except TastyTradeCredential.DoesNotExist:
+        messages.error(request, "No TastyTrade account found to delete.")
+        return redirect('home')
+    
+    if request.method == 'POST':
+        form = DeleteAccountConfirmationForm(request.POST)
+        if form.is_valid():
+            keep_data = form.cleaned_data['keep_data']
+            
+            if not keep_data:
+                # Delete all related data
+                Position.objects.filter(user=request.user, credential=credential).delete()
+                Transaction.objects.filter(user=request.user, credential=credential).delete()
+                DiscoveredAccount.objects.filter(user=request.user, credential=credential).delete()
+                
+                try:
+                    UserAccountPreferences.objects.filter(user=request.user, credential=credential).delete()
+                except UserAccountPreferences.DoesNotExist:
+                    pass
+            
+            # Delete the credential
+            credential.delete()
+            
+            messages.success(request, "Your TastyTrade Tracker account has been deleted.")
+            return redirect('home')
+    else:
+        form = DeleteAccountConfirmationForm()
+    
+    # Get data summary for user to understand what will be deleted
+    positions_count = Position.objects.filter(user=request.user, credential=credential).count()
+    transactions_count = Transaction.objects.filter(user=request.user, credential=credential).count()
+    
+    context = {
+        'form': form,
+        'positions_count': positions_count,
+        'transactions_count': transactions_count,
+    }
+    
+    return render(request, "tastytrade/delete_account.html", context)
