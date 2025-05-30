@@ -280,6 +280,8 @@ class TastyTradeAPI:
         items = data.get("data", {}).get("items", [])
         print(f"DEBUG: Retrieved {len(items)} positions")
         for pos in items:
+            print(f"DEBUG: Raw position data: {pos}")
+            
             # Parse expiry date if it's a string
             expiry = pos.get("expiration-date")
             if isinstance(expiry, str):
@@ -289,30 +291,89 @@ class TastyTradeAPI:
                 except (ValueError, AttributeError):
                     expiry = None
             
+            # Calculate market value and unrealized P&L from available fields
+            quantity = pos.get("quantity", 0)
+            close_price = float(pos.get("close-price", 0)) if pos.get("close-price") else 0
+            average_open_price = float(pos.get("average-open-price", 0)) if pos.get("average-open-price") else 0
+            multiplier = pos.get("multiplier", 1)
+            
+            market_value = quantity * close_price * multiplier if close_price else None
+            unrealized_pnl = (close_price - average_open_price) * quantity * multiplier if close_price and average_open_price else None
+            
+            # Calculate Greeks using Black-Scholes model
+            delta = None
+            theta = None
+            instrument_type = pos.get("instrument-type")
+            print(f"DEBUG: Position {pos.get('symbol')} - instrument-type: {instrument_type}, put-call: {pos.get('put-call')}, strike: {pos.get('strike-price')}")
+            
+            if instrument_type and "option" in instrument_type.lower():
+                from .options_pricing import calculate_option_greeks
+                print(f"DEBUG: Calculating Greeks for option {pos.get('symbol')}")
+                delta, theta = calculate_option_greeks(
+                    symbol=pos.get("symbol", ""),
+                    current_price=close_price,
+                    strike_price=pos.get("strike-price"),
+                    expiry_date=expiry,
+                    option_type=pos.get("put-call")
+                )
+                print(f"DEBUG: Calculated Greeks - Delta: {delta}, Theta: {theta}")
+            elif instrument_type and instrument_type.lower() == "equity":
+                # Stocks have delta of 0, theta of 0
+                print(f"DEBUG: Setting equity Greeks for {pos.get('symbol')}")
+                delta = 0.0
+                theta = 0.0
+            else:
+                print(f"DEBUG: No Greeks calculated for {pos.get('symbol')} - instrument type: {instrument_type}")
+            
+            # Scale Greeks by position size for portfolio calculations
+            if delta is not None:
+                delta = delta * quantity * multiplier
+            if theta is not None:
+                theta = theta * quantity * multiplier
+            
+            print(f"DEBUG: Final Greeks for {pos.get('symbol')} - Delta: {delta}, Theta: {theta} (scaled by quantity {quantity})")
+            
             positions.append({
                 "asset_type": pos.get("instrument-type", "other"),
                 "symbol": pos.get("symbol"),
-                "description": pos.get("description", ""),
-                "quantity": pos.get("quantity", 0),
-                "average_price": pos.get("average-price"),
-                "market_value": pos.get("market-value"),
-                "unrealized_pnl": pos.get("unrealized-pnl"),
-                "realized_pnl": pos.get("realized-pnl"),
-                "delta": pos.get("delta"),
-                "theta": pos.get("theta"),
-                "beta": pos.get("beta"),
+                "description": pos.get("underlying-symbol", ""),  # Use underlying symbol as description
+                "quantity": quantity,
+                "average_price": average_open_price if average_open_price else None,
+                "current_price": close_price if close_price else None,
+                "market_value": market_value,
+                "unrealized_pnl": unrealized_pnl,
+                "realized_pnl": float(pos.get("realized-today", 0)) if pos.get("realized-today") else 0,
+                "delta": delta,
+                "theta": theta,
+                "beta": None,   # Not available in basic positions endpoint
                 "expiry": expiry,
                 "strike": pos.get("strike-price"),
                 "option_type": pos.get("put-call"),
+                "multiplier": multiplier,  # Include multiplier for daily P&L calculation
             })
         return positions
 
-    def fetch_transactions(self, account_number):
+
+    def fetch_transactions(self, account_number, start_date=None):
         url = f"{self.base_url}/accounts/{account_number}/transactions"
+        
+        # Add date filtering if start_date is provided
+        params = {}
+        if start_date:
+            # Format date as YYYY-MM-DD for TastyTrade API
+            if hasattr(start_date, 'strftime'):
+                start_date_str = start_date.strftime('%Y-%m-%d')
+            else:
+                start_date_str = start_date
+            params['start-date'] = start_date_str
+            print(f"DEBUG: Fetching transactions from {start_date_str} onwards")
+        
         print(f"DEBUG: Fetching transactions from {url}")
+        print(f"DEBUG: Query params: {params}")
         print(f"DEBUG: Headers being sent: {dict(self.session.headers)}")
-        resp = self.session.get(url)
-        print(f"DEBUG: Transactions response {resp.status_code} {resp.text}")
+        
+        resp = self.session.get(url, params=params)
+        print(f"DEBUG: Transactions response {resp.status_code}")
         if resp.status_code != 200:
             raise Exception(f"Failed to fetch transactions: Status {resp.status_code}, Response: {resp.text}")
         data = resp.json()
@@ -326,7 +387,15 @@ class TastyTradeAPI:
             if isinstance(trade_date, str):
                 try:
                     from datetime import datetime
-                    trade_date = datetime.fromisoformat(trade_date.replace('Z', '+00:00'))
+                    from django.utils import timezone
+                    # Parse the date and make it timezone aware
+                    if 'T' in trade_date:
+                        # Full datetime
+                        trade_date = datetime.fromisoformat(trade_date.replace('Z', '+00:00'))
+                    else:
+                        # Date only - parse and make timezone aware
+                        trade_date = datetime.fromisoformat(trade_date)
+                        trade_date = timezone.make_aware(trade_date, timezone.get_current_timezone())
                 except (ValueError, AttributeError):
                     trade_date = None
             
@@ -340,13 +409,13 @@ class TastyTradeAPI:
                     expiry = None
             
             transactions.append({
-                "transaction_id": txn.get("transaction-id"),
-                "transaction_type": txn.get("type", "other"),
+                "transaction_id": txn.get("id"),  # Fixed: was "transaction-id"
+                "transaction_type": txn.get("transaction-type", "other"),  # Fixed: was "type"
                 "symbol": txn.get("symbol", ""),
                 "description": txn.get("description", ""),
                 "quantity": txn.get("quantity"),
                 "price": txn.get("price"),
-                "amount": txn.get("amount"),
+                "amount": txn.get("net-value"),  # Fixed: was "amount" 
                 "trade_date": trade_date,
                 "asset_type": txn.get("instrument-type", ""),
                 "expiry": expiry,

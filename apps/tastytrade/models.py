@@ -38,9 +38,13 @@ class Position(models.Model):
     description = models.CharField(max_length=256, blank=True)
     quantity = models.DecimalField(max_digits=20, decimal_places=4)
     average_price = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
+    current_price = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
+    previous_close_price = models.DecimalField(max_digits=20, decimal_places=4, null=True, blank=True)
     market_value = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
     unrealized_pnl = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
+    daily_unrealized_pnl = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
     realized_pnl = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
+    cash_collected = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)  # Total cash from this position
     delta = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
     theta = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
     beta = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)

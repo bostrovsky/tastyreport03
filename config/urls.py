@@ -16,11 +16,13 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from apps.tastytrade.views import dashboard
+from apps.tastytrade.views import dashboard, positions, transactions
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', dashboard, name='home'),
+    path('positions/', positions, name='positions'),
+    path('transactions/', transactions, name='transactions'),
     path('accounts/', include('allauth.urls')),
     path('tastytrade/', include('apps.tastytrade.urls')),
 ]

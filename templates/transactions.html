@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+
+{% block title %}Transactions - TastyTrade Tracker{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">📈 Transaction History</h1>
+            <p class="text-muted">Complete trading history with search and filters</p>
+        </div>
+        {% if tastytrade_credential %}
+            <div class="d-flex align-items-center gap-3">
+                <small class="text-muted">
+                    Last sync: 
+                    {% if tastytrade_credential.last_sync %}
+                        {{ tastytrade_credential.last_sync|timesince }} ago
+                    {% else %}
+                        Never
+                    {% endif %}
+                </small>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if not tastytrade_credential %}
+        <!-- No Account Connected -->
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="text-center py-5">
+                    <div class="mb-4">
+                        <i class="fas fa-link fa-3x text-muted"></i>
+                    </div>
+                    <h3>Connect Your TastyTrade Account</h3>
+                    <p class="text-muted mb-4">To view your transaction history, please connect your TastyTrade account first.</p>
+                    <a href="{% url 'tastytrade_connect' %}" class="btn btn-primary">Connect Account</a>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <!-- Summary Cards -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="tt-stat-card">
+                    <div class="tt-stat-card-header">
+                        <div class="tt-stat-card-title">Total Transactions</div>
+                        <div class="tt-stat-card-icon">📊</div>
+                    </div>
+                    <div class="tt-stat-card-value">{{ total_transactions }}</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="tt-stat-card">
+                    <div class="tt-stat-card-header">
+                        <div class="tt-stat-card-title">Total Amount</div>
+                        <div class="tt-stat-card-icon">💰</div>
+                    </div>
+                    <div class="tt-stat-card-value">
+                        {% if total_amount > 0 %}
+                            <span class="tt-positive">+${{ total_amount|floatformat:2 }}</span>
+                        {% elif total_amount < 0 %}
+                            <span class="tt-negative">${{ total_amount|floatformat:2 }}</span>
+                        {% else %}
+                            $0.00
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="tt-stat-card">
+                    <div class="tt-stat-card-header">
+                        <div class="tt-stat-card-title">Average Amount</div>
+                        <div class="tt-stat-card-icon">📈</div>
+                    </div>
+                    <div class="tt-stat-card-value">
+                        {% if avg_amount > 0 %}
+                            <span class="tt-positive">+${{ avg_amount|floatformat:2 }}</span>
+                        {% elif avg_amount < 0 %}
+                            <span class="tt-negative">${{ avg_amount|floatformat:2 }}</span>
+                        {% else %}
+                            $0.00
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search and Filter Bar -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="search" class="form-label">Search</label>
+                        <input type="text" class="form-control" id="search" name="search" 
+                               value="{{ search_query|default:'' }}" 
+                               placeholder="Search by symbol, description, or type...">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="type" class="form-label">Transaction Type</label>
+                        <select class="form-select" id="type" name="type">
+                            <option value="">All Types</option>
+                            {% for transaction_type in transaction_types %}
+                                <option value="{{ transaction_type }}" 
+                                        {% if selected_type == transaction_type %}selected{% endif %}>
+                                    {{ transaction_type|title }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search me-1"></i>Filter
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="d-grid">
+                            <a href="{% url 'transactions' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-1"></i>Clear
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if transactions %}
+            <!-- Transactions Table -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Transaction Details</h5>
+                    <span class="text-muted">
+                        Showing {{ transactions.start_index }}-{{ transactions.end_index }} of {{ total_transactions }} transactions
+                    </span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Symbol</th>
+                                    <th>Description</th>
+                                    <th>Type</th>
+                                    <th class="text-end">Quantity</th>
+                                    <th class="text-end">Price</th>
+                                    <th class="text-end">Amount</th>
+                                    <th>Account</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for transaction in transactions %}
+                                <tr>
+                                    <td>
+                                        <div>{{ transaction.trade_date|date:"M d, Y" }}</div>
+                                        <small class="text-muted">{{ transaction.trade_date|time:"g:i A" }}</small>
+                                    </td>
+                                    <td>
+                                        {% if transaction.symbol %}
+                                            <strong>{{ transaction.symbol }}</strong>
+                                            {% if transaction.option_type %}
+                                                <br><small class="text-muted">
+                                                    {% if transaction.expiry %}{{ transaction.expiry|date:"M d" }}{% endif %}
+                                                    {% if transaction.strike %}${{ transaction.strike }}{% endif %}
+                                                    {% if transaction.option_type %}{{ transaction.option_type|upper }}{% endif %}
+                                                </small>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="text-muted">{{ transaction.description|default:"—" }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-transaction-{{ transaction.transaction_type }}">
+                                            {{ transaction.transaction_type|default:"Other"|title }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        {% if transaction.quantity %}
+                                            {{ transaction.quantity|floatformat:0 }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if transaction.price %}
+                                            ${{ transaction.price|floatformat:2 }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if transaction.amount > 0 %}
+                                            <span class="tt-positive">+${{ transaction.amount|floatformat:2 }}</span>
+                                        {% elif transaction.amount < 0 %}
+                                            <span class="tt-negative">${{ transaction.amount|floatformat:2 }}</span>
+                                        {% else %}
+                                            $0.00
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ transaction.tastytrade_account_number }}</small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            {% if transactions.has_other_pages %}
+                <nav aria-label="Transaction pagination" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if transactions.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if selected_type %}type={{ selected_type }}&{% endif %}page={{ transactions.previous_page_number }}">
+                                    Previous
+                                </a>
+                            </li>
+                        {% endif %}
+
+                        {% for page_num in transactions.paginator.page_range %}
+                            {% if page_num == transactions.number %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ page_num }}</span>
+                                </li>
+                            {% elif page_num > transactions.number|add:'-3' and page_num < transactions.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if selected_type %}type={{ selected_type }}&{% endif %}page={{ page_num }}">
+                                        {{ page_num }}
+                                    </a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if transactions.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if selected_type %}type={{ selected_type }}&{% endif %}page={{ transactions.next_page_number }}">
+                                    Next
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+
+        {% else %}
+            <!-- No Transactions -->
+            <div class="text-center py-5">
+                <div class="mb-4">
+                    <i class="fas fa-receipt fa-3x text-muted"></i>
+                </div>
+                <h4>No Transactions Found</h4>
+                <p class="text-muted mb-4">
+                    {% if search_query or selected_type %}
+                        No transactions match your current filters.
+                    {% elif tastytrade_credential.last_sync %}
+                        Your account has no transactions, or they haven't synced yet.
+                    {% else %}
+                        Sync your TastyTrade account to see your transaction history.
+                    {% endif %}
+                </p>
+                {% if search_query or selected_type %}
+                    <a href="{% url 'transactions' %}" class="btn btn-primary">
+                        <i class="fas fa-times me-1"></i>Clear Filters
+                    </a>
+                {% elif not tastytrade_credential.last_sync %}
+                    <form method="post" action="{% url 'tastytrade_sync' %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-sync-alt me-1"></i>Sync Now
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+        {% endif %}
+    {% endif %}
+</div>
+
+<style>
+.badge-transaction-buy {
+    background-color: #10b981;
+    color: white;
+}
+
+.badge-transaction-sell {
+    background-color: #ef4444;
+    color: white;
+}
+
+.badge-transaction-dividend {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.badge-transaction-fee {
+    background-color: #f59e0b;
+    color: white;
+}
+
+.badge-transaction-interest {
+    background-color: #8b5cf6;
+    color: white;
+}
+
+.badge-transaction-other {
+    background-color: #6b7280;
+    color: white;
+}
+
+.badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.page-link {
+    color: #6366f1;
+}
+
+.page-item.active .page-link {
+    background-color: #6366f1;
+    border-color: #6366f1;
+}
+</style>
+{% endblock %}

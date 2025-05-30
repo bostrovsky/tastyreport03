@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+
+{% block title %}Positions - TastyTrade Tracker{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">📊 Current Positions</h1>
+            <p class="text-muted">Your current holdings with real-time P&L and Greeks</p>
+        </div>
+        {% if tastytrade_credential %}
+            <div class="d-flex align-items-center gap-3">
+                <small class="text-muted">
+                    Last sync: 
+                    {% if tastytrade_credential.last_sync %}
+                        {{ tastytrade_credential.last_sync|timesince }} ago
+                    {% else %}
+                        Never
+                    {% endif %}
+                </small>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if not tastytrade_credential %}
+        <!-- No Account Connected -->
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="text-center py-5">
+                    <div class="mb-4">
+                        <i class="fas fa-link fa-3x text-muted"></i>
+                    </div>
+                    <h3>Connect Your TastyTrade Account</h3>
+                    <p class="text-muted mb-4">To view your positions, please connect your TastyTrade account first.</p>
+                    <a href="{% url 'tastytrade_connect' %}" class="btn btn-primary">Connect Account</a>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <!-- Portfolio Summary Cards -->
+        <div class="row mb-4">
+            <div class="col-md-2">
+                <div class="tt-stat-card">
+                    <div class="tt-stat-card-header">
+                        <div class="tt-stat-card-title">Total Positions</div>
+                        <div class="tt-stat-card-icon">📊</div>
+                    </div>
+                    <div class="tt-stat-card-value">{{ total_positions }}</div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="tt-stat-card">
+                    <div class="tt-stat-card-header">
+                        <div class="tt-stat-card-title">Portfolio Value</div>
+                        <div class="tt-stat-card-icon">💰</div>
+                    </div>
+                    <div class="tt-stat-card-value">${{ total_market_value|floatformat:2 }}</div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="tt-stat-card">
+                    <div class="tt-stat-card-header">
+                        <div class="tt-stat-card-title">Total Delta</div>
+                        <div class="tt-stat-card-icon">Δ</div>
+                    </div>
+                    <div class="tt-stat-card-value">
+                        {% if total_delta %}
+                            {% if total_delta > 0 %}
+                                <span class="tt-positive">+{{ total_delta|floatformat:2 }}</span>
+                            {% elif total_delta < 0 %}
+                                <span class="tt-negative">{{ total_delta|floatformat:2 }}</span>
+                            {% else %}
+                                0.00
+                            {% endif %}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="tt-stat-card">
+                    <div class="tt-stat-card-header">
+                        <div class="tt-stat-card-title">Total Theta</div>
+                        <div class="tt-stat-card-icon">Θ</div>
+                    </div>
+                    <div class="tt-stat-card-value">
+                        {% if total_theta %}
+                            {% if total_theta > 0 %}
+                                <span class="tt-positive">+{{ total_theta|floatformat:2 }}</span>
+                            {% elif total_theta < 0 %}
+                                <span class="tt-negative">{{ total_theta|floatformat:2 }}</span>
+                            {% else %}
+                                0.00
+                            {% endif %}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="tt-stat-card">
+                    <div class="tt-stat-card-header">
+                        <div class="tt-stat-card-title">Unrealized P&L</div>
+                        <div class="tt-stat-card-icon">📈</div>
+                    </div>
+                    <div class="tt-stat-card-value">
+                        {% if total_unrealized_pnl > 0 %}
+                            <span class="tt-positive">+${{ total_unrealized_pnl|floatformat:2 }}</span>
+                        {% elif total_unrealized_pnl < 0 %}
+                            <span class="tt-negative">${{ total_unrealized_pnl|floatformat:2 }}</span>
+                        {% else %}
+                            $0.00
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="tt-stat-card">
+                    <div class="tt-stat-card-header">
+                        <div class="tt-stat-card-title">Realized P&L</div>
+                        <div class="tt-stat-card-icon">✅</div>
+                    </div>
+                    <div class="tt-stat-card-value">
+                        {% if total_realized_pnl > 0 %}
+                            <span class="tt-positive">+${{ total_realized_pnl|floatformat:2 }}</span>
+                        {% elif total_realized_pnl < 0 %}
+                            <span class="tt-negative">${{ total_realized_pnl|floatformat:2 }}</span>
+                        {% else %}
+                            $0.00
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if positions_by_account %}
+            <!-- Positions by Account -->
+            {% for account_number, account_positions in positions_by_account.items %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Account {{ account_number }} ({{ account_positions|length }} position{{ account_positions|length|pluralize }})</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Description</th>
+                                    <th>Asset Type</th>
+                                    <th class="text-end">Quantity</th>
+                                    <th class="text-end">Avg Price</th>
+                                    <th class="text-end">Market Value</th>
+                                    <th class="text-end">Unrealized P&L</th>
+                                    <th class="text-end">Delta</th>
+                                    <th class="text-end">Theta</th>
+                                    <th>Account</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for position in account_positions %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ position.symbol }}</strong>
+                                        {% if position.option_type %}
+                                            <br><small class="text-muted">
+                                                {% if position.expiry %}{{ position.expiry|date:"M d, Y" }}{% endif %}
+                                                {% if position.strike %}${{ position.strike }}{% endif %}
+                                                {% if position.option_type %}{{ position.option_type|upper }}{% endif %}
+                                            </small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="text-muted">{{ position.description|default:"—" }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-asset-{{ position.asset_type }}">
+                                            {{ position.asset_type|default:"Other"|title }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        {% if position.quantity %}
+                                            {{ position.quantity|floatformat:0 }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if position.average_price %}
+                                            ${{ position.average_price|floatformat:2 }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if position.market_value %}
+                                            ${{ position.market_value|floatformat:2 }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if position.unrealized_pnl %}
+                                            {% if position.unrealized_pnl > 0 %}
+                                                <span class="tt-positive">+${{ position.unrealized_pnl|floatformat:2 }}</span>
+                                            {% elif position.unrealized_pnl < 0 %}
+                                                <span class="tt-negative">${{ position.unrealized_pnl|floatformat:2 }}</span>
+                                            {% else %}
+                                                $0.00
+                                            {% endif %}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if position.delta %}
+                                            {{ position.delta|floatformat:3 }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if position.theta %}
+                                            {{ position.theta|floatformat:3 }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ position.tastytrade_account_number }}</small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <!-- No Positions -->
+            <div class="text-center py-5">
+                <div class="mb-4">
+                    <i class="fas fa-chart-line fa-3x text-muted"></i>
+                </div>
+                <h4>No Positions Found</h4>
+                <p class="text-muted mb-4">
+                    {% if tastytrade_credential.last_sync %}
+                        Your account has no current positions, or they haven't synced yet.
+                    {% else %}
+                        Sync your TastyTrade account to see your positions.
+                    {% endif %}
+                </p>
+                {% if not tastytrade_credential.last_sync %}
+                    <form method="post" action="{% url 'tastytrade_sync' %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-sync-alt me-1"></i>Sync Now
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+        {% endif %}
+    {% endif %}
+</div>
+
+<style>
+.badge-asset-equity {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.badge-asset-option {
+    background-color: #8b5cf6;
+    color: white;
+}
+
+.badge-asset-crypto {
+    background-color: #f59e0b;
+    color: white;
+}
+
+.badge-asset-future {
+    background-color: #10b981;
+    color: white;
+}
+
+.badge-asset-other {
+    background-color: #6b7280;
+    color: white;
+}
+
+.badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+</style>
+{% endblock %}

@@ -21,65 +21,222 @@
 </div>
 {% else %}
 
-<!-- Stats Row -->
+<!-- Dashboard Overview -->
 <div class="row mb-5">
-  <div class="col-md-3 mb-4">
-    <div class="tt-stat-card">
-      <div class="tt-stat-card-label">Account Status</div>
-      <div class="tt-stat-card-value">Connected</div>
-      <div class="tt-stat-card-change tt-positive">{{ tastytrade_credential.username }}</div>
+  <!-- Account Overview Card -->
+  <div class="col-md-6 mb-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Account Overview</h5>
+        <div class="row">
+          <div class="col-6">
+            <div class="mb-3">
+              <small class="text-muted d-block">Status</small>
+              <span class="badge bg-success">Connected</span>
+            </div>
+            <div>
+              <small class="text-muted d-block">Account</small>
+              <span class="fw-medium">{{ tastytrade_credential.username }}</span>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="mb-3">
+              <small class="text-muted d-block">Last Sync</small>
+              <span class="fw-medium">
+                {% if tastytrade_credential.last_sync %}
+                  {{ tastytrade_credential.last_sync|date:"M j, H:i" }}
+                {% else %}
+                  Never
+                {% endif %}
+              </span>
+            </div>
+            <div>
+              <small class="text-muted d-block">Data Status</small>
+              <span class="text-muted">
+                {% if tastytrade_credential.last_sync %}
+                  Synced
+                {% else %}
+                  Sync needed
+                {% endif %}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="col-md-3 mb-4">
-    <div class="tt-stat-card">
-      <div class="tt-stat-card-label">Last Sync</div>
-      <div class="tt-stat-card-value">
+
+  <!-- Portfolio Summary Card -->
+  <div class="col-md-6 mb-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Portfolio Summary</h5>
+        <div class="row">
+          <div class="col-6">
+            <div class="mb-3">
+              <small class="text-muted d-block">Total Positions</small>
+              <span class="h4 mb-0">
+                {% if tastytrade_credential.last_sync %}
+                  {{ total_positions }}
+                {% else %}
+                  --
+                {% endif %}
+              </span>
+            </div>
+            <div class="mb-3">
+              <small class="text-muted d-block">Realized P&L Today</small>
+              <span class="h6 mb-0">
+                {% if tastytrade_credential.last_sync %}
+                  {% if todays_realized_pnl > 0 %}
+                    <span class="text-success">+${{ todays_realized_pnl|floatformat:2 }}</span>
+                  {% elif todays_realized_pnl < 0 %}
+                    <span class="text-danger">${{ todays_realized_pnl|floatformat:2 }}</span>
+                  {% else %}
+                    $0.00
+                  {% endif %}
+                {% else %}
+                  --
+                {% endif %}
+              </span>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="mb-3">
+              <small class="text-muted d-block">Portfolio Value</small>
+              <span class="h4 mb-0">
+                {% if tastytrade_credential.last_sync %}
+                  ${{ total_market_value|default:0|floatformat:2 }}
+                {% else %}
+                  --
+                {% endif %}
+              </span>
+            </div>
+            <div class="mb-3">
+              <small class="text-muted d-block">Daily Unrealized P&L</small>
+              <span class="h6 mb-0">
+                {% if tastytrade_credential.last_sync %}
+                  {% if daily_unrealized_pnl > 0 %}
+                    <span class="text-success">+${{ daily_unrealized_pnl|floatformat:2 }}</span>
+                  {% elif daily_unrealized_pnl < 0 %}
+                    <span class="text-danger">${{ daily_unrealized_pnl|floatformat:2 }}</span>
+                  {% else %}
+                    $0.00
+                  {% endif %}
+                {% else %}
+                  --
+                {% endif %}
+              </span>
+            </div>
+          </div>
+        </div>
         {% if tastytrade_credential.last_sync %}
-          {{ tastytrade_credential.last_sync|date:"M j" }}
-        {% else %}
-          Never
+          <div class="row mt-2">
+            <div class="col-12">
+              <small class="text-muted">
+                {% if todays_realized_pnl != 0 %}
+                  {{ todays_transactions|length }} transaction{{ todays_transactions|length|pluralize }} today
+                {% else %}
+                  No trades today
+                {% endif %}
+                • {{ total_positions }} active position{{ total_positions|pluralize }}
+              </small>
+            </div>
+          </div>
         {% endif %}
       </div>
-      <div class="tt-stat-card-change">
-        {% if tastytrade_credential.last_sync %}
-          {{ tastytrade_credential.last_sync|date:"H:i" }}
-        {% else %}
-          Sync now to get started
-        {% endif %}
-      </div>
-    </div>
-  </div>
-  <div class="col-md-3 mb-4">
-    <div class="tt-stat-card">
-      <div class="tt-stat-card-label">Total Positions</div>
-      <div class="tt-stat-card-value">--</div>
-      <div class="tt-stat-card-change">Available after sync</div>
-    </div>
-  </div>
-  <div class="col-md-3 mb-4">
-    <div class="tt-stat-card">
-      <div class="tt-stat-card-label">P&L Today</div>
-      <div class="tt-stat-card-value">--</div>
-      <div class="tt-stat-card-change">Available after sync</div>
     </div>
   </div>
 </div>
 
 <!-- Sync progress is now handled by the global status box in base.html -->
 
-<!-- Recent Activity Placeholder -->
+<!-- Recent Activity -->
 <div class="row">
   <div class="col-12">
     <div class="tt-data-table-container">
       <div class="tt-data-table-header">
-        <h3 class="tt-heading-3 mb-0">Recent Activity</h3>
+        <h3 class="tt-heading-3 mb-0">Today's Activity</h3>
         <div class="tt-data-table-actions">
-          <button class="btn btn-sm btn-outline-primary" disabled>Coming Soon</button>
+          {% if has_recent_activity %}
+            <a href="/transactions/" class="btn btn-sm btn-outline-primary">View All</a>
+          {% endif %}
         </div>
       </div>
-      <div class="card-body text-center py-5">
-        <p class="tt-text-secondary">Your recent trading activity will appear here after syncing your data.</p>
-      </div>
+      
+      {% if has_recent_activity %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Time</th>
+                <th>Type</th>
+                <th>Symbol</th>
+                <th>Description</th>
+                <th>Quantity</th>
+                <th class="text-end">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for transaction in todays_transactions %}
+                <tr>
+                  <td class="text-muted small">
+                    {{ transaction.trade_date|date:"H:i" }}
+                  </td>
+                  <td>
+                    <span class="badge bg-{% if transaction.transaction_type == 'trade' %}primary{% elif transaction.transaction_type == 'dividend' %}success{% elif transaction.transaction_type == 'fee' %}warning{% else %}secondary{% endif %}">
+                      {{ transaction.transaction_type|capfirst }}
+                    </span>
+                  </td>
+                  <td class="fw-bold">
+                    {% if transaction.symbol %}
+                      {{ transaction.symbol }}
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-muted">
+                    {% if transaction.description %}
+                      {{ transaction.description|truncatechars:40 }}
+                    {% else %}
+                      {{ transaction.transaction_type|capfirst }} transaction
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if transaction.quantity %}
+                      <span class="{% if transaction.quantity > 0 %}text-success{% elif transaction.quantity < 0 %}text-danger{% endif %}">
+                        {{ transaction.quantity|floatformat:0 }}
+                      </span>
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    <span class="{% if transaction.amount > 0 %}text-success{% elif transaction.amount < 0 %}text-danger{% endif %} fw-medium">
+                      {% if transaction.amount > 0 %}+{% endif %}${{ transaction.amount|floatformat:2 }}
+                    </span>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="card-body text-center py-5">
+          {% if tastytrade_credential.last_sync %}
+            <div class="mb-3">
+              <i class="fas fa-calendar-day text-muted" style="font-size: 2rem;"></i>
+            </div>
+            <p class="tt-text-secondary mb-2">No trades today</p>
+            <p class="small text-muted">Your trading activity from today will appear here after you make trades.</p>
+          {% else %}
+            <div class="mb-3">
+              <i class="fas fa-sync-alt text-muted" style="font-size: 2rem;"></i>
+            </div>
+            <p class="tt-text-secondary mb-2">Sync your data to see today's activity</p>
+            <p class="small text-muted">Your recent trading activity will appear here after syncing your data.</p>
+          {% endif %}
+        </div>
+      {% endif %}
     </div>
   </div>
 </div>
