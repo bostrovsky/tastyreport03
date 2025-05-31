@@ -1,5 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse
 from django.urls import reverse
 from apps.tastytrade.models import TastyTradeCredential, Position, Transaction, UserAccountPreferences, DiscoveredAccount
@@ -8,8 +10,8 @@ from apps.tastytrade.forms import (
     TastyTradePasswordChangeForm, DeleteAccountConfirmationForm
 )
 from django.utils import timezone
-from django.contrib import messages
 from django.db import transaction as db_transaction
+from django.db.models import Q
 from .tastytrade_api import TastyTradeAPI
 import logging
 
@@ -484,6 +486,104 @@ def positions(request, account_number=None):
             'total_theta': portfolio_stats['total_theta'],
         })
         
+        # Calculate fees and interest by year
+        from django.db.models import Q, Sum
+        from datetime import date
+        
+        # Base filter for fees and interest (Money Movement transactions with specific descriptions)
+        fee_interest_filter = {
+            'user': request.user,
+            'credential': credential,
+            'transaction_type': 'Money Movement',
+            'description__in': [
+                'Regulatory fee adjustment',  # Fees
+                'INTEREST ON CREDIT BALANCE',  # Interest
+                'FULLYPAID LENDING REBATE'     # Interest rebates
+            ]
+        }
+        if account_number:
+            fee_interest_filter['tastytrade_account_number'] = account_number
+            
+        # Get all fee/interest transactions
+        fee_interest_transactions = Transaction.objects.filter(**fee_interest_filter)
+        
+        # Calculate totals by year and type
+        current_year = date.today().year
+        
+        # Fees by year
+        fees_by_year = {}
+        interest_by_year = {}
+        
+        # Get distinct years from fee/interest transactions
+        fee_years = list(fee_interest_transactions.dates('trade_date', 'year'))
+        fee_years = [date.year for date in fee_years] if fee_years else []
+        
+        # Also get years from all transactions for complete year list
+        all_transactions = Transaction.objects.filter(
+            user=request.user,
+            credential=credential
+        )
+        if account_number:
+            all_transactions = all_transactions.filter(tastytrade_account_number=account_number)
+            
+        all_years = list(all_transactions.dates('trade_date', 'year'))
+        all_years = [date.year for date in all_years] if all_years else []
+        
+        # Combine and deduplicate years
+        years = sorted(set(fee_years + all_years), reverse=True)
+        
+        # Debug output - check what transaction types actually exist
+        all_transaction_types = all_transactions.values_list('transaction_type', flat=True).distinct()
+        print(f"DEBUG: All transaction types in database: {list(all_transaction_types)}")
+        print(f"DEBUG: Found {fee_interest_transactions.count()} fee/interest transactions with filter: {fee_interest_filter}")
+        print(f"DEBUG: Fee years: {fee_years}")
+        print(f"DEBUG: All transaction years: {all_years}")
+        print(f"DEBUG: Combined years: {years}")
+        
+        for year in years:
+            # Calculate fees for this year (Regulatory fee adjustments)
+            year_fees = fee_interest_transactions.filter(
+                trade_date__year=year,
+                description='Regulatory fee adjustment'
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            
+            # Calculate interest for this year (Interest + lending rebates)
+            year_interest = fee_interest_transactions.filter(
+                trade_date__year=year,
+                description__in=['INTEREST ON CREDIT BALANCE', 'FULLYPAID LENDING REBATE']
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            
+            fees_by_year[year] = year_fees
+            interest_by_year[year] = year_interest
+        
+        # Calculate year-to-date for current year
+        ytd_fees = fees_by_year.get(current_year, 0)
+        ytd_interest = interest_by_year.get(current_year, 0)
+        
+        # Total all-time
+        total_fees = sum(fees_by_year.values())
+        total_interest = sum(interest_by_year.values())
+        
+        # Convert to JSON for template (convert Decimal to float for JSON serialization)
+        import json
+        
+        # Convert Decimal values to float for JSON serialization
+        fees_by_year_json = {year: float(amount) for year, amount in fees_by_year.items()}
+        interest_by_year_json = {year: float(amount) for year, amount in interest_by_year.items()}
+        
+        context.update({
+            'fees_by_year': fees_by_year,
+            'interest_by_year': interest_by_year,
+            'fees_by_year_json': json.dumps(fees_by_year_json),
+            'interest_by_year_json': json.dumps(interest_by_year_json),
+            'current_year': current_year,
+            'ytd_fees': ytd_fees,
+            'ytd_interest': ytd_interest,
+            'total_fees': total_fees,
+            'total_interest': total_interest,
+            'available_years': sorted(years, reverse=True) if years else [],
+        })
+        
         # Calculate portfolio allocation by symbol for pie chart
         total_value = context['total_market_value']
         if total_value > 0:
@@ -645,25 +745,63 @@ def transactions(request, account_number=None):
         
         context['transaction_types'] = [t for t in transaction_types if t]
         
-        # Pagination - 50 transactions per page
+        # Handle sorting
+        sort_by = request.GET.get('sort', '-trade_date')  # Default: newest first
+        sort_direction = 'desc' if sort_by.startswith('-') else 'asc'
+        sort_field = sort_by.lstrip('-')
+        
+        # Valid sort fields
+        valid_sorts = ['trade_date', 'symbol', 'description', 'transaction_type', 'quantity', 'price', 'amount']
+        if sort_field not in valid_sorts:
+            sort_by = '-trade_date'
+            sort_field = 'trade_date'
+            sort_direction = 'desc'
+        
+        # Separate trading transactions from fees/interest
+        # Fee/interest are Money Movement transactions with specific descriptions
+        fee_interest_filter = Q(
+            transaction_type='Money Movement',
+            description__in=[
+                'Regulatory fee adjustment',  # Fees
+                'INTEREST ON CREDIT BALANCE',  # Interest
+                'FULLYPAID LENDING REBATE'     # Interest rebates
+            ]
+        )
+        trading_transactions = transactions.exclude(fee_interest_filter).order_by(sort_by)
+        fee_interest_transactions = transactions.filter(fee_interest_filter).order_by(sort_by)
+        
+        context.update({
+            'current_sort': sort_field,
+            'sort_direction': sort_direction,
+            'sort_param': sort_by
+        })
+        
+        # Pagination for trading transactions only
         from django.core.paginator import Paginator
-        paginator = Paginator(transactions, 50)
+        paginator = Paginator(trading_transactions, 50)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
-        
         context['transactions'] = page_obj
-        context['total_transactions'] = transactions.count()
+        context['fee_interest_transactions'] = fee_interest_transactions
+        context['total_transactions'] = trading_transactions.count()
+        context['total_fees_interest'] = fee_interest_transactions.count()
         
-        # Calculate summary statistics for filtered transactions  
+        # Calculate summary statistics for trading transactions only
         from django.db import models
-        summary_stats = transactions.aggregate(
+        trading_stats = trading_transactions.aggregate(
             total_amount=models.Sum('amount'),
             avg_amount=models.Avg('amount'),
         )
         
+        # Calculate fee/interest totals separately
+        fee_interest_stats = fee_interest_transactions.aggregate(
+            total_fees_interest=models.Sum('amount'),
+        )
+        
         context.update({
-            'total_amount': summary_stats['total_amount'] or 0,
-            'avg_amount': summary_stats['avg_amount'] or 0,
+            'total_amount': trading_stats['total_amount'] or 0,
+            'avg_amount': trading_stats['avg_amount'] or 0,
+            'total_fees_interest': fee_interest_stats['total_fees_interest'] or 0,
         })
         
         # Add account-specific title
@@ -683,6 +821,102 @@ def transactions(request, account_number=None):
         context['page_title'] = 'Transactions'
     
     return render(request, "transactions.html", context)
+
+
+@require_http_methods(["POST"])
+@login_required
+def assign_strategy(request):
+    """Assign selected transactions to a strategy"""
+    try:
+        credential = request.user.tastytrade_credential
+        
+        # Get form data
+        strategy_type = request.POST.get('strategy_type')
+        strategy_name = request.POST.get('strategy_name', '').strip()
+        transaction_ids = request.POST.getlist('transaction_ids')
+        
+        # Check if this is an AJAX request
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        
+        if not strategy_type or not transaction_ids:
+            error_msg = "Please select a strategy type and at least one transaction."
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': error_msg})
+            messages.error(request, error_msg)
+            return redirect('transactions')
+        
+        # Get selected transactions
+        transactions = Transaction.objects.filter(
+            id__in=transaction_ids,
+            user=request.user,
+            credential=credential
+        )
+        
+        if not transactions.exists():
+            error_msg = "No valid transactions selected."
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': error_msg})
+            messages.error(request, error_msg)
+            return redirect('transactions')
+        
+        # Create strategy name if not provided
+        if not strategy_name:
+            # Generate name based on first transaction's symbol and strategy type
+            first_transaction = transactions.first()
+            # Extract clean symbol for strategy naming
+            symbol = first_transaction.symbol or "UNKNOWN"
+            if ' ' in symbol:
+                symbol = symbol.split(' ')[0]  # Take underlying part
+            elif symbol.startswith('/') and len(symbol) > 3:
+                # For futures, extract /ABC123 part
+                import re
+                match = re.match(r'^(\/[A-Z]+\d*)', symbol)
+                symbol = match.group(1) if match else symbol
+            elif not symbol.startswith('/'):
+                # For options, extract letters before digits
+                import re
+                match = re.match(r'^([A-Z]+)', symbol)
+                symbol = match.group(1) if match else symbol
+                
+            readable_strategy = strategy_type.replace('_', ' ').title()
+            strategy_name = f"{symbol} {readable_strategy}"
+        
+        # Create the strategy
+        from .models import TradingStrategy
+        strategy = TradingStrategy.objects.create(
+            user=request.user,
+            strategy_type=strategy_type,
+            name=strategy_name,
+            underlying_symbol=transactions.first().symbol or "",
+            description=f"Created from {transactions.count()} transaction(s)"
+        )
+        
+        # Associate transactions with strategy
+        for transaction in transactions:
+            transaction.strategy = strategy
+            transaction.save()
+        
+        # Success response
+        transaction_count = transactions.count()
+        success_msg = f"Successfully created '{strategy_name}' strategy with {transaction_count} transaction{'s' if transaction_count != 1 else ''}."
+        
+        if is_ajax:
+            return JsonResponse({
+                'success': True,
+                'strategy_name': strategy.name,
+                'strategy_type_display': strategy.get_strategy_type_display(),
+                'message': success_msg
+            })
+        
+        messages.success(request, success_msg)
+        return redirect('transactions')
+        
+    except Exception as e:
+        error_msg = f"Error creating strategy: {str(e)}"
+        if is_ajax:
+            return JsonResponse({'success': False, 'error': error_msg})
+        messages.error(request, error_msg)
+        return redirect('transactions')
 
 
 @login_required
@@ -906,3 +1140,56 @@ def delete_account(request):
     }
     
     return render(request, "tastytrade/delete_account.html", context)
+
+
+
+
+@login_required  
+def run_strategy_identification(request):
+    """Test strategy identification and provide feedback"""
+    if request.method == 'POST':
+        try:
+            # Get user's transactions
+            credential = request.user.tastytrade_credential
+            account_number = request.POST.get('account_number')
+            
+            transaction_filter = {
+                'user': request.user,
+                'credential': credential
+            }
+            if account_number:
+                transaction_filter['tastytrade_account_number'] = account_number
+            
+            transactions = Transaction.objects.filter(**transaction_filter).order_by('-trade_date')[:100]  # Test with recent 100
+            
+            if not transactions:
+                messages.info(request, 'No transactions found to analyze.')
+                return redirect(request.META.get('HTTP_REFERER', '/transactions/'))
+            
+            # Test strategy identification
+            from .simple_strategy_identifier import SimpleStrategyIdentifier
+            identifier = SimpleStrategyIdentifier()
+            strategies = identifier.identify_strategies_for_transactions(transactions)
+            
+            if strategies:
+                strategy_types = [s['strategy_type'] for s in strategies]
+                strategy_counts = {}
+                for st in strategy_types:
+                    strategy_counts[st] = strategy_counts.get(st, 0) + 1
+                
+                summary = ", ".join([f"{count} {strategy}" for strategy, count in strategy_counts.items()])
+                messages.success(
+                    request, 
+                    f'Strategy identification successful! Found: {summary}'
+                )
+            else:
+                messages.info(
+                    request,
+                    'No strategies identified from recent transactions.'
+                )
+                
+        except Exception as e:
+            messages.error(request, f'Error identifying strategies: {e}')
+    
+    # Redirect back to referring page (transactions or positions)
+    return redirect(request.META.get('HTTP_REFERER', '/transactions/'))

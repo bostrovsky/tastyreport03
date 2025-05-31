@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}Strategies - TastyTrade Tracker{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">🎯 {{ page_title|default:"Trading Strategies" }}</h1>
+            <p class="text-muted">Your trading strategies grouped as net positions</p>
+            {% if current_account %}
+                <div class="mb-3">
+                    <span class="badge bg-primary">Account {{ current_account }}</span>
+                    <a href="{% url 'strategies' %}" class="btn btn-sm btn-outline-secondary ms-2">View All Accounts</a>
+                </div>
+            {% endif %}
+        </div>
+        {% if tastytrade_credential %}
+            <div class="d-flex align-items-center gap-3">
+                <small class="text-muted">
+                    Last sync: 
+                    {% if tastytrade_credential.last_sync %}
+                        {{ tastytrade_credential.last_sync|timesince }} ago
+                    {% else %}
+                        Never
+                    {% endif %}
+                </small>
+                <form method="post" action="{% url 'run_strategy_identification' %}" class="d-inline">
+                    {% csrf_token %}
+                    {% if current_account %}
+                        <input type="hidden" name="account_number" value="{{ current_account }}">
+                    {% endif %}
+                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-magic me-1"></i>Identify Strategies
+                    </button>
+                </form>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if not tastytrade_credential %}
+        <!-- No Account Connected -->
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="text-center py-5">
+                    <div class="mb-4">
+                        <i class="fas fa-link fa-3x text-muted"></i>
+                    </div>
+                    <h3>Connect Your TastyTrade Account</h3>
+                    <p class="text-muted mb-4">To view your strategies, please connect your TastyTrade account first.</p>
+                    <a href="{% url 'tastytrade_connect' %}" class="btn btn-primary">Connect Account</a>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <!-- View Selection Controls -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h6 class="mb-0">Group By:</h6>
+                        <div class="btn-group mt-2" role="group">
+                            {% for value, label in grouping_options %}
+                                <a href="{% url 'strategies' %}?group_by={{ value }}{% if current_account %}&account={{ current_account }}{% endif %}" 
+                                   class="btn btn-sm {% if current_grouping == value %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                                    {{ label }}
+                                </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <div class="d-flex justify-content-end gap-3">
+                            <div class="text-center">
+                                <div class="h5 mb-0 text-primary">{{ total_strategies }}</div>
+                                <small class="text-muted">Total Strategies</small>
+                            </div>
+                            <div class="text-center">
+                                <div class="h5 mb-0 text-success">{{ open_strategies }}</div>
+                                <small class="text-muted">Open</small>
+                            </div>
+                            <div class="text-center">
+                                <div class="h5 mb-0 {% if total_net_pnl > 0 %}text-success{% elif total_net_pnl < 0 %}text-danger{% else %}text-muted{% endif %}">
+                                    {% if total_net_pnl > 0 %}+{% endif %}${{ total_net_pnl|floatformat:2 }}
+                                </div>
+                                <small class="text-muted">Net P&L</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if error %}
+            <!-- Error Message -->
+            <div class="alert alert-danger" role="alert">
+                <h4 class="alert-heading">Error!</h4>
+                <p>{{ error }}</p>
+            </div>
+        {% elif grouped_strategies %}
+            <!-- Grouped Strategies -->
+            {% for group_key, strategies in grouped_strategies %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="card-title mb-0">
+                                {% if current_grouping == 'underlying' %}
+                                    📈 {{ group_key }}
+                                {% elif current_grouping == 'strategy' %}
+                                    🎯 {{ group_key }}
+                                {% elif current_grouping == 'expiration' %}
+                                    📅 {{ group_key }}
+                                {% else %}
+                                    {{ group_key }}
+                                {% endif %}
+                            </h5>
+                            <small class="text-muted">{{ strategies|length }} strateg{{ strategies|length|pluralize:"y,ies" }}</small>
+                        </div>
+                        <div class="text-end">
+                            <div class="h6 mb-0 text-primary">
+                                ${{ strategies.0.net_pnl|default:"0"|floatformat:2 }}
+                            </div>
+                            <small class="text-muted">
+                                {{ strategies|length }} strateg{{ strategies|length|pluralize:"y,ies" }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Strategy</th>
+                                    <th>Details</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Net P&L</th>
+                                    <th class="text-end">Confidence</th>
+                                    <th>Opened</th>
+                                    <th>Expiry</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for strategy in strategies %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if strategy.is_system_inferred %}
+                                                <i class="fas fa-robot text-primary me-2" title="Auto-detected"></i>
+                                            {% else %}
+                                                <i class="fas fa-user text-success me-2" title="User-created"></i>
+                                            {% endif %}
+                                            <div>
+                                                <div class="fw-bold">
+                                                    {% if strategy.custom_name %}
+                                                        {{ strategy.custom_name }}
+                                                    {% else %}
+                                                        {{ strategy.get_strategy_type_display }}
+                                                    {% endif %}
+                                                </div>
+                                                {% if current_grouping != 'underlying' %}
+                                                    <small class="text-muted">{{ strategy.underlying_symbol }}</small>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="small">
+                                            {% if strategy.legs.count > 1 %}
+                                                <div class="text-muted">{{ strategy.legs.count }} legs</div>
+                                            {% endif %}
+                                            {% if strategy.max_profit %}
+                                                <div class="text-success small">Max: ${{ strategy.max_profit|floatformat:0 }}</div>
+                                            {% endif %}
+                                            {% if strategy.max_loss %}
+                                                <div class="text-danger small">Risk: ${{ strategy.max_loss|floatformat:0 }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if strategy.status == 'open' %}bg-success
+                                            {% elif strategy.status == 'closed' %}bg-secondary
+                                            {% elif strategy.status == 'partially_closed' %}bg-warning
+                                            {% elif strategy.status == 'expired' %}bg-dark
+                                            {% elif strategy.status == 'assigned' %}bg-info
+                                            {% else %}bg-light text-dark{% endif %}">
+                                            {{ strategy.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        {% if strategy.net_pnl > 0 %}
+                                            <span class="tt-positive">+${{ strategy.net_pnl|floatformat:2 }}</span>
+                                        {% elif strategy.net_pnl < 0 %}
+                                            <span class="tt-negative">${{ strategy.net_pnl|floatformat:2 }}</span>
+                                        {% else %}
+                                            <span class="text-muted">$0.00</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if strategy.confidence_score %}
+                                            <div class="d-flex align-items-center justify-content-end">
+                                                <div class="progress me-2" style="width: 50px; height: 4px;">
+                                                    <div class="progress-bar {% if strategy.confidence_score >= 80 %}bg-success{% elif strategy.confidence_score >= 60 %}bg-warning{% else %}bg-danger{% endif %}" style="width: {{ strategy.confidence_score }}%"></div>
+                                                </div>
+                                                <small class="text-muted">{{ strategy.confidence_score|floatformat:0 }}%</small>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted small">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="small">{{ strategy.opened_date|date:"M d, Y" }}</div>
+                                        {% if strategy.closed_date %}
+                                            <div class="small text-muted">Closed: {{ strategy.closed_date|date:"M d" }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if strategy.expiry_date %}
+                                            <div class="small">{{ strategy.expiry_date|date:"M d, Y" }}</div>
+                                            {% if strategy.days_to_expiry %}
+                                                <div class="small {% if strategy.days_to_expiry <= 7 %}text-danger{% elif strategy.days_to_expiry <= 30 %}text-warning{% else %}text-muted{% endif %}">
+                                                    {{ strategy.days_to_expiry }} day{{ strategy.days_to_expiry|pluralize }}
+                                                </div>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted small">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="{% url 'strategy_detail' strategy.id %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <!-- No Strategies -->
+            <div class="text-center py-5">
+                <div class="mb-4">
+                    <i class="fas fa-chart-line fa-3x text-muted"></i>
+                </div>
+                <h4>No Strategies Found</h4>
+                <p class="text-muted mb-4">
+                    {% if total_strategies == 0 %}
+                        You don't have any identified strategies yet. Click "Identify Strategies" to automatically detect strategies from your transactions.
+                    {% else %}
+                        No strategies match the current filter criteria.
+                    {% endif %}
+                </p>
+                {% if total_strategies == 0 %}
+                    <form method="post" action="{% url 'run_strategy_identification' %}" class="d-inline">
+                        {% csrf_token %}
+                        {% if current_account %}
+                            <input type="hidden" name="account_number" value="{{ current_account }}">
+                        {% endif %}
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-magic me-1"></i>Identify Strategies
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+        {% endif %}
+    {% endif %}
+</div>
+
+<style>
+.tt-positive {
+    color: #059669;
+    font-weight: 500;
+}
+
+.tt-negative {
+    color: #dc2626;
+    font-weight: 500;
+}
+
+.progress {
+    background-color: #e5e7eb;
+}
+
+.badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.btn-group .btn {
+    border-radius: 0.375rem;
+}
+
+.btn-group .btn:not(:last-child) {
+    margin-right: 0.25rem;
+}
+
+.card-title {
+    color: #374151;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) > td {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+</style>
+
+{% endblock %}

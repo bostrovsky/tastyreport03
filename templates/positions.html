@@ -246,6 +246,149 @@
             </div>
         </div>
 
+        <!-- Yearly Performance Tabs -->
+        {% if available_years %}
+        <div class="card mb-4">
+            <div class="card-header p-0">
+                <ul class="nav nav-tabs nav-fill" id="yearTabs" role="tablist">
+                    {% for year in available_years %}
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link {% if year == current_year %}active{% endif %}" 
+                                    id="year-{{ year }}-tab" 
+                                    data-bs-toggle="tab" 
+                                    data-bs-target="#year-{{ year }}" 
+                                    type="button" 
+                                    role="tab"
+                                    aria-controls="year-{{ year }}"
+                                    aria-selected="{% if year == current_year %}true{% else %}false{% endif %}">
+                                <strong>{{ year }}</strong>
+                                {% if year == current_year %}
+                                    <br><small class="text-success">Year to Date</small>
+                                {% endif %}
+                            </button>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            
+            <div class="tab-content" id="yearTabContent">
+                {% for year in available_years %}
+                <div class="tab-pane fade {% if year == current_year %}show active{% endif %}" 
+                     id="year-{{ year }}" 
+                     role="tabpanel"
+                     aria-labelledby="year-{{ year }}-tab">
+                    
+                    <div class="card-body">
+                        <!-- {{ year }} Summary Cards -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-3">
+                                <div class="card border-0 bg-light h-100">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-receipt text-danger mb-2"></i>
+                                        <h6 class="card-title text-muted mb-1">Fees Paid</h6>
+                                        <h4 class="mb-2" id="fees-{{ year }}">
+                                            <span class="text-muted">$0.00</span>
+                                        </h4>
+                                        <button class="btn btn-sm btn-outline-secondary" 
+                                                onclick="toggleFeeDetails({{ year }})">
+                                            <i class="fas fa-eye me-1"></i>View Details
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-3">
+                                <div class="card border-0 bg-light h-100">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-percentage text-success mb-2"></i>
+                                        <h6 class="card-title text-muted mb-1">Interest</h6>
+                                        <h4 class="mb-2" id="interest-{{ year }}">
+                                            <span class="text-muted">$0.00</span>
+                                        </h4>
+                                        <button class="btn btn-sm btn-outline-secondary" 
+                                                onclick="toggleInterestDetails({{ year }})">
+                                            <i class="fas fa-eye me-1"></i>View Details
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-3">
+                                <div class="card border-0 bg-info text-white h-100">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-chart-line mb-2"></i>
+                                        <h6 class="card-title mb-1">Trading P&L</h6>
+                                        <h4 class="mb-2">
+                                            <span class="text-light">Coming Soon</span>
+                                        </h4>
+                                        <small class="opacity-75">Strategy-based calculation</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-3">
+                                <div class="card border-0 bg-primary text-white h-100">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-trophy mb-2"></i>
+                                        <h6 class="card-title mb-1">Net {{ year }} P&L</h6>
+                                        <h4 class="mb-2">
+                                            <span class="text-light">Coming Soon</span>
+                                        </h4>
+                                        <small class="opacity-75">Total Performance</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Collapsible Detail Sections -->
+                        <div id="fee-details-{{ year }}" class="collapse">
+                            <div class="card border-danger mb-3">
+                                <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">💸 {{ year }} Fee Breakdown</h6>
+                                    <button class="btn btn-sm btn-outline-light" onclick="toggleFeeDetails({{ year }})">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted mb-0">No fee transactions found for {{ year }}.</p>
+                                    <small class="text-muted">Detailed fee breakdown will appear here once you have trading fees.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="interest-details-{{ year }}" class="collapse">
+                            <div class="card border-success mb-3">
+                                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">💰 {{ year }} Interest Breakdown</h6>
+                                    <button class="btn btn-sm btn-outline-light" onclick="toggleInterestDetails({{ year }})">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted mb-0">No interest transactions found for {{ year }}.</p>
+                                    <small class="text-muted">Interest payments and earnings will appear here.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <!-- No Transaction History -->
+        <div class="card mb-4">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-calendar-alt fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No Transaction History</h5>
+                <p class="text-muted">Sync your TastyTrade account to see yearly performance summaries.</p>
+                <a href="{% url 'tastytrade_sync' %}" class="btn btn-primary">
+                    <i class="fas fa-sync-alt me-1"></i>Sync Transactions
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
         {% if positions_by_account %}
             <!-- Positions by Account -->
             {% for account_number, account_positions in positions_by_account.items %}
@@ -588,5 +731,59 @@ document.addEventListener('DOMContentLoaded', function() {
     new Chart(deltaCtx, deltaConfig);
 {% endif %}
 });
+
+// Fee and Interest Management
+const feesData = {{ fees_by_year_json|safe }};
+const interestData = {{ interest_by_year_json|safe }};
+
+// Populate year totals
+document.addEventListener('DOMContentLoaded', function() {
+    // Update fee and interest displays for each year
+    Object.keys(feesData).forEach(year => {
+        const feeElement = document.getElementById(`fees-${year}`);
+        const interestElement = document.getElementById(`interest-${year}`);
+        
+        if (feeElement) {
+            const feeAmount = feesData[year];
+            if (feeAmount < 0) {
+                feeElement.innerHTML = `<span class="text-danger">$${feeAmount.toFixed(2)}</span>`;
+            } else if (feeAmount > 0) {
+                feeElement.innerHTML = `<span class="text-success">+$${feeAmount.toFixed(2)}</span>`;
+            } else {
+                feeElement.innerHTML = `<span class="text-muted">$0.00</span>`;
+            }
+        }
+        
+        if (interestElement) {
+            const interestAmount = interestData[year] || 0;
+            if (interestAmount < 0) {
+                interestElement.innerHTML = `<span class="text-danger">$${interestAmount.toFixed(2)}</span>`;
+            } else if (interestAmount > 0) {
+                interestElement.innerHTML = `<span class="text-success">+$${interestAmount.toFixed(2)}</span>`;
+            } else {
+                interestElement.innerHTML = `<span class="text-muted">$0.00</span>`;
+            }
+        }
+    });
+});
+
+function toggleFeeDetails(year) {
+    const detailsElement = document.getElementById(`fee-details-${year}`);
+    if (detailsElement) {
+        const collapse = new bootstrap.Collapse(detailsElement, {
+            toggle: true
+        });
+    }
+}
+
+function toggleInterestDetails(year) {
+    const detailsElement = document.getElementById(`interest-details-${year}`);
+    if (detailsElement) {
+        const collapse = new bootstrap.Collapse(detailsElement, {
+            toggle: true
+        });
+    }
+}
+
 </script>
 {% endblock %}

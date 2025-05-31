@@ -26,6 +26,15 @@
                         Never
                     {% endif %}
                 </small>
+                <form method="post" action="{% url 'run_strategy_identification' %}" class="d-inline">
+                    {% csrf_token %}
+                    {% if current_account %}
+                        <input type="hidden" name="account_number" value="{{ current_account }}">
+                    {% endif %}
+                    <button type="submit" class="btn btn-sm btn-outline-info">
+                        <i class="fas fa-search me-1"></i>Test Strategy ID
+                    </button>
+                </form>
             </div>
         {% endif %}
     </div>
@@ -47,19 +56,19 @@
     {% else %}
         <!-- Summary Cards -->
         <div class="row mb-4">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="tt-stat-card">
                     <div class="tt-stat-card-header">
-                        <div class="tt-stat-card-title">Total Transactions</div>
+                        <div class="tt-stat-card-title">Trading Transactions</div>
                         <div class="tt-stat-card-icon">📊</div>
                     </div>
                     <div class="tt-stat-card-value">{{ total_transactions }}</div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="tt-stat-card">
                     <div class="tt-stat-card-header">
-                        <div class="tt-stat-card-title">Total Amount</div>
+                        <div class="tt-stat-card-title">Trading Amount</div>
                         <div class="tt-stat-card-icon">💰</div>
                     </div>
                     <div class="tt-stat-card-value">
@@ -73,20 +82,39 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="tt-stat-card">
                     <div class="tt-stat-card-header">
-                        <div class="tt-stat-card-title">Average Amount</div>
-                        <div class="tt-stat-card-icon">📈</div>
+                        <div class="tt-stat-card-title">Fees & Interest</div>
+                        <div class="tt-stat-card-icon">💸</div>
                     </div>
                     <div class="tt-stat-card-value">
-                        {% if avg_amount > 0 %}
-                            <span class="tt-positive">+${{ avg_amount|floatformat:2 }}</span>
-                        {% elif avg_amount < 0 %}
-                            <span class="tt-negative">${{ avg_amount|floatformat:2 }}</span>
+                        {% if total_fees_interest > 0 %}
+                            <span class="tt-positive">+${{ total_fees_interest|floatformat:2 }}</span>
+                        {% elif total_fees_interest < 0 %}
+                            <span class="tt-negative">${{ total_fees_interest|floatformat:2 }}</span>
                         {% else %}
                             $0.00
                         {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="tt-stat-card">
+                    <div class="tt-stat-card-header">
+                        <div class="tt-stat-card-title">Net Total</div>
+                        <div class="tt-stat-card-icon">📈</div>
+                    </div>
+                    <div class="tt-stat-card-value">
+                        {% with net_total=total_amount|add:total_fees_interest %}
+                            {% if net_total > 0 %}
+                                <span class="tt-positive">+${{ net_total|floatformat:2 }}</span>
+                            {% elif net_total < 0 %}
+                                <span class="tt-negative">${{ net_total|floatformat:2 }}</span>
+                            {% else %}
+                                $0.00
+                            {% endif %}
+                        {% endwith %}
                     </div>
                 </div>
             </div>
@@ -134,13 +162,34 @@
             </div>
         </div>
 
+
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
         {% if transactions %}
-            <!-- Transactions Table -->
+            <!-- CSRF token for AJAX requests -->
+            {% csrf_token %}
+
+            <!-- Sortable Transactions Table -->
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">Transaction Details</h5>
+                    <div>
+                        <h5 class="card-title mb-0">Transaction Details</h5>
+                        <p class="text-muted mb-0 mt-1">Use the dropdown in each row to assign transactions to strategies</p>
+                    </div>
                     <span class="text-muted">
-                        Showing {{ transactions.start_index }}-{{ transactions.end_index }} of {{ total_transactions }} transactions
+                        {% if transactions.start_index %}
+                            Showing {{ transactions.start_index }}-{{ transactions.end_index }} of {{ total_transactions }} transactions
+                        {% else %}
+                            {{ total_transactions }} transactions
+                        {% endif %}
                     </span>
                 </div>
                 <div class="card-body p-0">
@@ -148,33 +197,71 @@
                         <table class="table table-striped mb-0">
                             <thead>
                                 <tr>
-                                    <th>Date</th>
-                                    <th>Symbol</th>
-                                    <th>Description</th>
-                                    <th>Type</th>
-                                    <th class="text-end">Quantity</th>
-                                    <th class="text-end">Price</th>
-                                    <th class="text-end">Amount</th>
-                                    <th>Account</th>
+                                    <th>
+                                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if selected_type %}type={{ selected_type }}&{% endif %}sort={% if current_sort == 'trade_date' and sort_direction == 'asc' %}-{% endif %}trade_date" class="text-decoration-none text-dark">
+                                            Date
+                                            {% if current_sort == 'trade_date' %}
+                                                {% if sort_direction == 'asc' %}↑{% else %}↓{% endif %}
+                                            {% endif %}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if selected_type %}type={{ selected_type }}&{% endif %}sort={% if current_sort == 'symbol' and sort_direction == 'asc' %}-{% endif %}symbol" class="text-decoration-none text-dark">
+                                            Symbol
+                                            {% if current_sort == 'symbol' %}
+                                                {% if sort_direction == 'asc' %}↑{% else %}↓{% endif %}
+                                            {% endif %}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if selected_type %}type={{ selected_type }}&{% endif %}sort={% if current_sort == 'description' and sort_direction == 'asc' %}-{% endif %}description" class="text-decoration-none text-dark">
+                                            Description
+                                            {% if current_sort == 'description' %}
+                                                {% if sort_direction == 'asc' %}↑{% else %}↓{% endif %}
+                                            {% endif %}
+                                        </a>
+                                    </th>
+                                    <th class="text-end">
+                                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if selected_type %}type={{ selected_type }}&{% endif %}sort={% if current_sort == 'quantity' and sort_direction == 'asc' %}-{% endif %}quantity" class="text-decoration-none text-dark">
+                                            Quantity
+                                            {% if current_sort == 'quantity' %}
+                                                {% if sort_direction == 'asc' %}↑{% else %}↓{% endif %}
+                                            {% endif %}
+                                        </a>
+                                    </th>
+                                    <th class="text-end">
+                                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if selected_type %}type={{ selected_type }}&{% endif %}sort={% if current_sort == 'price' and sort_direction == 'asc' %}-{% endif %}price" class="text-decoration-none text-dark">
+                                            Price
+                                            {% if current_sort == 'price' %}
+                                                {% if sort_direction == 'asc' %}↑{% else %}↓{% endif %}
+                                            {% endif %}
+                                        </a>
+                                    </th>
+                                    <th class="text-end">
+                                        <a href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if selected_type %}type={{ selected_type }}&{% endif %}sort={% if current_sort == 'amount' and sort_direction == 'asc' %}-{% endif %}amount" class="text-decoration-none text-dark">
+                                            Amount
+                                            {% if current_sort == 'amount' %}
+                                                {% if sort_direction == 'asc' %}↑{% else %}↓{% endif %}
+                                            {% endif %}
+                                        </a>
+                                    </th>
+                                    <th width="50" class="text-center">Select</th>
+                                    <th>Strategy</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for transaction in transactions %}
                                 <tr>
                                     <td>
-                                        <div>{{ transaction.trade_date|date:"M d, Y" }}</div>
-                                        <small class="text-muted">{{ transaction.trade_date|time:"g:i A" }}</small>
+                                        {% if transaction.trade_date|time:"H:i" != "00:00" %}
+                                            {{ transaction.trade_date|date:"n/j/y g:i A" }}
+                                        {% else %}
+                                            {{ transaction.trade_date|date:"n/j/y" }}
+                                        {% endif %}
                                     </td>
                                     <td>
                                         {% if transaction.symbol %}
-                                            <strong>{{ transaction.symbol }}</strong>
-                                            {% if transaction.option_type %}
-                                                <br><small class="text-muted">
-                                                    {% if transaction.expiry %}{{ transaction.expiry|date:"M d" }}{% endif %}
-                                                    {% if transaction.strike %}${{ transaction.strike }}{% endif %}
-                                                    {% if transaction.option_type %}{{ transaction.option_type|upper }}{% endif %}
-                                                </small>
-                                            {% endif %}
+                                            <span class="underlying-symbol">{{ transaction.symbol }}</span>
                                         {% else %}
                                             <span class="text-muted">—</span>
                                         {% endif %}
@@ -182,14 +269,13 @@
                                     <td>
                                         <span class="text-muted">{{ transaction.description|default:"—" }}</span>
                                     </td>
-                                    <td>
-                                        <span class="badge badge-transaction-{{ transaction.transaction_type }}">
-                                            {{ transaction.transaction_type|default:"Other"|title }}
-                                        </span>
-                                    </td>
                                     <td class="text-end">
                                         {% if transaction.quantity %}
-                                            {{ transaction.quantity|floatformat:0 }}
+                                            {% if transaction.description|slice:":4" == "Sold" %}
+                                                <span class="text-danger">-{{ transaction.quantity|floatformat:0 }}</span>
+                                            {% else %}
+                                                <span class="text-success">+{{ transaction.quantity|floatformat:0 }}</span>
+                                            {% endif %}
                                         {% else %}
                                             —
                                         {% endif %}
@@ -202,16 +288,49 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-end">
-                                        {% if transaction.amount > 0 %}
-                                            <span class="tt-positive">+${{ transaction.amount|floatformat:2 }}</span>
-                                        {% elif transaction.amount < 0 %}
-                                            <span class="tt-negative">${{ transaction.amount|floatformat:2 }}</span>
+                                        {% if transaction.amount %}
+                                            {% if transaction.description|slice:":4" == "Sold" %}
+                                                <span class="tt-positive">+${{ transaction.amount|floatformat:2 }}</span>
+                                            {% else %}
+                                                <span class="tt-negative">-${{ transaction.amount|floatformat:2 }}</span>
+                                            {% endif %}
                                         {% else %}
                                             $0.00
                                         {% endif %}
                                     </td>
+                                    <td class="text-center">
+                                        <input type="checkbox" class="form-check-input transaction-checkbox" name="transaction_ids" value="{{ transaction.id }}" style="transform: scale(1.2);">
+                                    </td>
                                     <td>
-                                        <small class="text-muted">{{ transaction.tastytrade_account_number }}</small>
+                                        {% if transaction.strategy %}
+                                            <span class="text-success small">{{ transaction.strategy.name }}</span>
+                                            <br><small class="text-muted">{{ transaction.strategy.get_strategy_type_display }}</small>
+                                        {% else %}
+                                            <select class="form-select form-select-sm strategy-dropdown" data-transaction-id="{{ transaction.id }}">
+                                                <option value="">Select strategy...</option>
+                                                <option value="long_stock">Long Stock</option>
+                                                <option value="short_stock">Short Stock</option>
+                                                <option value="covered_call">Covered Call</option>
+                                                <option value="cash_secured_put">Cash Secured Put</option>
+                                                <option value="long_call">Long Call</option>
+                                                <option value="short_call">Short Call</option>
+                                                <option value="long_put">Long Put</option>
+                                                <option value="short_put">Short Put</option>
+                                                <option value="long_straddle">Long Straddle</option>
+                                                <option value="short_straddle">Short Straddle</option>
+                                                <option value="long_strangle">Long Strangle</option>
+                                                <option value="short_strangle">Short Strangle</option>
+                                                <option value="bull_call_spread">Bull Call Spread</option>
+                                                <option value="bear_call_spread">Bear Call Spread</option>
+                                                <option value="bull_put_spread">Bull Put Spread</option>
+                                                <option value="bear_put_spread">Bear Put Spread</option>
+                                                <option value="iron_condor">Iron Condor</option>
+                                                <option value="iron_butterfly">Iron Butterfly</option>
+                                                <option value="jade_lizard">Jade Lizard</option>
+                                                <option value="reverse_jade_lizard">Reverse Jade Lizard</option>
+                                                <option value="custom">Custom Strategy</option>
+                                            </select>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -220,15 +339,15 @@
                     </div>
                 </div>
             </div>
-
+            
             <!-- Pagination -->
             {% if transactions.has_other_pages %}
                 <nav aria-label="Transaction pagination" class="mt-4">
                     <ul class="pagination justify-content-center">
                         {% if transactions.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if selected_type %}type={{ selected_type }}&{% endif %}page={{ transactions.previous_page_number }}">
-                                    Previous
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if selected_type %}type={{ selected_type }}&{% endif %}{% if sort_param %}sort={{ sort_param }}&{% endif %}page={{ transactions.previous_page_number }}">
+                                    ← Previous
                                 </a>
                             </li>
                         {% endif %}
@@ -238,9 +357,9 @@
                                 <li class="page-item active">
                                     <span class="page-link">{{ page_num }}</span>
                                 </li>
-                            {% elif page_num > transactions.number|add:'-3' and page_num < transactions.number|add:'3' %}
+                            {% elif page_num > transactions.number|add:'-2' and page_num < transactions.number|add:'3' %}
                                 <li class="page-item">
-                                    <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if selected_type %}type={{ selected_type }}&{% endif %}page={{ page_num }}">
+                                    <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if selected_type %}type={{ selected_type }}&{% endif %}{% if sort_param %}sort={{ sort_param }}&{% endif %}page={{ page_num }}">
                                         {{ page_num }}
                                     </a>
                                 </li>
@@ -249,13 +368,76 @@
 
                         {% if transactions.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if selected_type %}type={{ selected_type }}&{% endif %}page={{ transactions.next_page_number }}">
-                                    Next
+                                <a class="page-link" href="?{% if search_query %}search={{ search_query }}&{% endif %}{% if selected_type %}type={{ selected_type }}&{% endif %}{% if sort_param %}sort={{ sort_param }}&{% endif %}page={{ transactions.next_page_number }}">
+                                    Next →
                                 </a>
                             </li>
                         {% endif %}
                     </ul>
                 </nav>
+            {% endif %}
+
+            <!-- Fees and Interest Section -->
+            {% if fee_interest_transactions %}
+                <div class="card mt-4">
+                    <div class="card-header bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">💸 Fees & Interest</h6>
+                            <div class="text-muted">
+                                {{ total_fees_interest }} transactions • 
+                                {% if total_fees_interest > 0 %}
+                                    <span class="text-success">+${{ total_fees_interest|floatformat:2 }}</span>
+                                {% elif total_fees_interest < 0 %}
+                                    <span class="text-danger">${{ total_fees_interest|floatformat:2 }}</span>
+                                {% else %}
+                                    $0.00
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Type</th>
+                                        <th>Description</th>
+                                        <th class="text-end">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for transaction in fee_interest_transactions %}
+                                    <tr>
+                                        <td>
+                                            {% if transaction.trade_date|time:"H:i" != "00:00" %}
+                                                {{ transaction.trade_date|date:"n/j/y g:i A" }}
+                                            {% else %}
+                                                {{ transaction.trade_date|date:"n/j/y" }}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary small">{{ transaction.transaction_type|title }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="text-muted small">{{ transaction.description|default:"—" }}</span>
+                                        </td>
+                                        <td class="text-end">
+                                            {% if transaction.amount > 0 %}
+                                                <span class="text-success">+${{ transaction.amount|floatformat:2 }}</span>
+                                            {% elif transaction.amount < 0 %}
+                                                <span class="text-danger">${{ transaction.amount|floatformat:2 }}</span>
+                                            {% else %}
+                                                $0.00
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             {% endif %}
 
         {% else %}
@@ -337,5 +519,179 @@
     background-color: #6366f1;
     border-color: #6366f1;
 }
+
+/* Single line table rows */
+.table td {
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* Professional table styling - consistent across all columns */
+.table td {
+    padding: 8px 12px;
+    font-size: 14px;
+    font-weight: 400;
+    font-family: inherit;
+}
+
+.table th {
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* Compact date column - keep monospace for better alignment */
+.table td:nth-child(2) {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: 400;
+}
+
+/* Remove any bold/strong styling overrides */
+.table td strong,
+.table td .underlying-symbol,
+.table td .text-success,
+.table td .text-muted {
+    font-weight: 400;
+    font-size: inherit;
+}
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Inline strategy assignment script loaded');
+    
+    // Handle strategy dropdown changes
+    const strategyDropdowns = document.querySelectorAll('.strategy-dropdown');
+    
+    strategyDropdowns.forEach(dropdown => {
+        dropdown.addEventListener('change', function() {
+            const transactionId = this.dataset.transactionId;
+            const strategyType = this.value;
+            
+            if (strategyType) {
+                assignTransactionToStrategy(transactionId, strategyType, this);
+            }
+        });
+    });
+    
+    // Assign individual transaction to strategy
+    function assignTransactionToStrategy(transactionId, strategyType, dropdownElement) {
+        // Disable dropdown while processing
+        dropdownElement.disabled = true;
+        
+        // Show loading state
+        const originalHTML = dropdownElement.outerHTML;
+        dropdownElement.style.opacity = '0.6';
+        
+        // Prepare form data
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+        formData.append('transaction_ids', transactionId);
+        formData.append('strategy_type', strategyType);
+        
+        // Send AJAX request
+        fetch('/tastytrade/assign-strategy/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Replace dropdown with strategy name
+                const cell = dropdownElement.parentElement;
+                cell.innerHTML = `
+                    <span class="text-success small">${data.strategy_name}</span>
+                    <br><small class="text-muted">${data.strategy_type_display}</small>
+                `;
+                
+                // Show success message
+                showMessage('success', `Transaction assigned to "${data.strategy_name}" strategy.`);
+            } else {
+                // Show error and restore dropdown
+                dropdownElement.disabled = false;
+                dropdownElement.style.opacity = '1';
+                dropdownElement.value = '';
+                showMessage('error', data.error || 'Failed to assign strategy.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            dropdownElement.disabled = false;
+            dropdownElement.style.opacity = '1';
+            dropdownElement.value = '';
+            showMessage('error', 'Network error occurred.');
+        });
+    }
+    
+    // Show message to user
+    function showMessage(type, message) {
+        const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+        const messageHtml = `
+            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        
+        // Insert message at top of page
+        const messagesContainer = document.querySelector('.container-fluid');
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = messageHtml;
+        messagesContainer.insertBefore(tempDiv.firstElementChild, messagesContainer.firstElementChild);
+        
+        // Auto-dismiss success messages
+        if (type === 'success') {
+            setTimeout(() => {
+                const alertElement = document.querySelector('.alert-success');
+                if (alertElement) {
+                    alertElement.remove();
+                }
+            }, 3000);
+        }
+    }
+    
+    // Clean up symbol display to show only underlying
+    function cleanUpSymbols() {
+        const symbolElements = document.querySelectorAll('.underlying-symbol');
+        symbolElements.forEach(element => {
+            const fullSymbol = element.textContent.trim();
+            const cleanSymbol = extractUnderlyingSymbol(fullSymbol);
+            if (cleanSymbol !== fullSymbol) {
+                element.textContent = cleanSymbol;
+                element.title = `Full symbol: ${fullSymbol}`;
+            }
+        });
+    }
+    
+    // Extract underlying symbol from complex option symbols
+    function extractUnderlyingSymbol(symbol) {
+        if (!symbol) return symbol;
+        
+        // If there's a space, the underlying is everything before the first space
+        // Examples: "/GCQ5 OGQ5250728C3800" → "/GCQ5", "/ZBU5 OZBN5250620C127" → "/ZBU5"
+        if (symbol.includes(' ')) {
+            return symbol.split(' ')[0];
+        }
+        
+        // Handle futures symbols starting with / (no space case)
+        if (symbol.startsWith('/')) {
+            // For futures like /GCQ5250728C3800, extract /GCQ5
+            const match = symbol.match(/^(\/[A-Z]+\d*)/);
+            return match ? match[1] : symbol;
+        }
+        
+        // Handle regular options like CRM250620C00340000
+        // Extract letters before the first digit
+        const match = symbol.match(/^([A-Z]+)/);
+        return match ? match[1] : symbol;
+    }
+    
+    // Clean up symbols on page load
+    cleanUpSymbols();
+});
+</script>
 {% endblock %}

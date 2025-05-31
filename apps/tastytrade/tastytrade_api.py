@@ -382,6 +382,16 @@ class TastyTradeAPI:
         items = data.get("data", {}).get("items", [])
         print(f"DEBUG: Retrieved {len(items)} transactions")
         for txn in items:
+            # Debug: Print first transaction to see available fields
+            if len(transactions) == 0:
+                print(f"DEBUG: First transaction fields: {list(txn.keys())}")
+                print(f"DEBUG: Transaction date value: {txn.get('transaction-date')}")
+                # Check for other potential time fields
+                potential_time_fields = ['time', 'executed-at', 'trade-time', 'timestamp', 'created-at', 'executed-time']
+                for field in potential_time_fields:
+                    if field in txn:
+                        print(f"DEBUG: Found time field '{field}': {txn.get(field)}")
+            
             # Parse transaction date if it's a string
             trade_date = txn.get("transaction-date")
             if isinstance(trade_date, str):

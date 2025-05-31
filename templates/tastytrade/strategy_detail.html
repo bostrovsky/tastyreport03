@@ -1,0 +1,431 @@
+{% extends "base.html" %}
+
+{% block title %}Strategy Detail - TastyTrade Tracker{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    {% if error %}
+        <!-- Error Message -->
+        <div class="alert alert-danger" role="alert">
+            <h4 class="alert-heading">Error!</h4>
+            <p>{{ error }}</p>
+            <a href="{% url 'strategies' %}" class="btn btn-outline-danger">← Back to Strategies</a>
+        </div>
+    {% else %}
+        <!-- Strategy Header -->
+        <div class="d-flex justify-content-between align-items-start mb-4">
+            <div>
+                <div class="d-flex align-items-center mb-2">
+                    <a href="{% url 'strategies' %}" class="btn btn-sm btn-outline-secondary me-3">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </a>
+                    <h1 class="h3 mb-0">
+                        {% if strategy.custom_name %}
+                            {{ strategy.custom_name }}
+                        {% else %}
+                            {{ strategy.get_strategy_type_display }}
+                        {% endif %}
+                    </h1>
+                    {% if strategy.is_system_inferred %}
+                        <span class="badge bg-primary ms-2">Auto-detected</span>
+                    {% else %}
+                        <span class="badge bg-success ms-2">User-created</span>
+                    {% endif %}
+                </div>
+                <p class="text-muted mb-1">{{ strategy.underlying_symbol }} • Account {{ strategy.account_number }}</p>
+                <div class="d-flex align-items-center gap-3">
+                    <span class="badge 
+                        {% if strategy.status == 'open' %}bg-success
+                        {% elif strategy.status == 'closed' %}bg-secondary
+                        {% elif strategy.status == 'partially_closed' %}bg-warning
+                        {% elif strategy.status == 'expired' %}bg-dark
+                        {% elif strategy.status == 'assigned' %}bg-info
+                        {% else %}bg-light text-dark{% endif %}">
+                        {{ strategy.get_status_display }}
+                    </span>
+                    {% if strategy.confidence_score %}
+                        <small class="text-muted">
+                            Confidence: {{ strategy.confidence_score|floatformat:0 }}%
+                        </small>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="text-end">
+                <div class="h2 mb-0 {% if strategy.net_pnl > 0 %}text-success{% elif strategy.net_pnl < 0 %}text-danger{% else %}text-muted{% endif %}">
+                    {% if strategy.net_pnl > 0 %}+{% endif %}${{ strategy.net_pnl|floatformat:2 }}
+                </div>
+                <small class="text-muted">Net P&L</small>
+            </div>
+        </div>
+
+        <!-- Strategy Overview -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Strategy Overview</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <strong>Opened Date:</strong><br>
+                                    <span class="text-muted">{{ strategy.opened_date|date:"F d, Y \a\t g:i A" }}</span>
+                                </div>
+                                {% if strategy.closed_date %}
+                                <div class="mb-3">
+                                    <strong>Closed Date:</strong><br>
+                                    <span class="text-muted">{{ strategy.closed_date|date:"F d, Y \a\t g:i A" }}</span>
+                                </div>
+                                {% endif %}
+                                {% if strategy.expiry_date %}
+                                <div class="mb-3">
+                                    <strong>Expiry Date:</strong><br>
+                                    <span class="text-muted">{{ strategy.expiry_date|date:"F d, Y" }}</span>
+                                    {% if strategy.days_to_expiry %}
+                                        <br><small class="{% if strategy.days_to_expiry <= 7 %}text-danger{% elif strategy.days_to_expiry <= 30 %}text-warning{% else %}text-muted{% endif %}">
+                                            {{ strategy.days_to_expiry }} day{{ strategy.days_to_expiry|pluralize }} remaining
+                                        </small>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                {% if strategy.max_profit %}
+                                <div class="mb-3">
+                                    <strong>Max Profit:</strong><br>
+                                    <span class="text-success">${{ strategy.max_profit|floatformat:2 }}</span>
+                                </div>
+                                {% endif %}
+                                {% if strategy.max_loss %}
+                                <div class="mb-3">
+                                    <strong>Max Loss:</strong><br>
+                                    <span class="text-danger">${{ strategy.max_loss|floatformat:2 }}</span>
+                                </div>
+                                {% endif %}
+                                {% if strategy.breakeven_points %}
+                                <div class="mb-3">
+                                    <strong>Breakeven Points:</strong><br>
+                                    {% for point in strategy.breakeven_points %}
+                                        <span class="badge bg-info me-1">${{ point|floatformat:2 }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if strategy.notes %}
+                        <div class="mt-3">
+                            <strong>Notes:</strong><br>
+                            <div class="bg-light p-2 rounded mt-1">{{ strategy.notes }}</div>
+                        </div>
+                        {% endif %}
+                        {% if strategy.tags %}
+                        <div class="mt-3">
+                            <strong>Tags:</strong><br>
+                            {% for tag in strategy.tags %}
+                                <span class="badge bg-secondary me-1">{{ tag }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Quick Stats</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between">
+                                <span>Strategy Legs:</span>
+                                <strong>{{ legs|length }}</strong>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between">
+                                <span>Total Transactions:</span>
+                                <strong>{{ transactions|length }}</strong>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between">
+                                <span>Created:</span>
+                                <span class="text-muted small">{{ strategy.created_at|date:"M d, Y" }}</span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between">
+                                <span>Last Updated:</span>
+                                <span class="text-muted small">{{ strategy.updated_at|date:"M d, Y" }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Strategy Legs -->
+        {% if legs %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Strategy Legs ({{ legs|length }})</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Asset Type</th>
+                                <th class="text-end">Quantity</th>
+                                <th class="text-end">Average Price</th>
+                                <th class="text-end">Current Value</th>
+                                <th>Expiry</th>
+                                <th>Strike</th>
+                                <th>Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for leg in legs %}
+                            <tr>
+                                <td><strong>{{ leg.symbol }}</strong></td>
+                                <td>
+                                    <span class="badge badge-asset-{{ leg.asset_type }}">
+                                        {{ leg.asset_type|title }}
+                                    </span>
+                                </td>
+                                <td class="text-end">{{ leg.quantity|floatformat:0 }}</td>
+                                <td class="text-end">
+                                    {% if leg.average_price %}
+                                        ${{ leg.average_price|floatformat:2 }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    {% if leg.current_value %}
+                                        ${{ leg.current_value|floatformat:2 }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if leg.expiry %}
+                                        {{ leg.expiry|date:"M d, Y" }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if leg.strike %}
+                                        ${{ leg.strike|floatformat:2 }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if leg.option_type %}
+                                        <span class="badge 
+                                            {% if leg.option_type == 'call' %}bg-success
+                                            {% elif leg.option_type == 'put' %}bg-danger
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ leg.option_type|upper }}
+                                        </span>
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Transaction History -->
+        {% if transactions %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Transaction History ({{ transactions|length }})</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Symbol</th>
+                                <th>Description</th>
+                                <th class="text-end">Quantity</th>
+                                <th class="text-end">Price</th>
+                                <th class="text-end">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for transaction in transactions %}
+                            <tr>
+                                <td>
+                                    <div class="small">{{ transaction.trade_date|date:"M d, Y" }}</div>
+                                    <div class="small text-muted">{{ transaction.trade_date|date:"g:i A" }}</div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark">
+                                        {{ transaction.transaction_type|title }}
+                                    </span>
+                                </td>
+                                <td><strong>{{ transaction.symbol }}</strong></td>
+                                <td>
+                                    <span class="text-muted small">{{ transaction.description|default:"—" }}</span>
+                                </td>
+                                <td class="text-end">
+                                    {% if transaction.quantity %}
+                                        {{ transaction.quantity|floatformat:0 }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    {% if transaction.price %}
+                                        ${{ transaction.price|floatformat:4 }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    {% if transaction.amount > 0 %}
+                                        <span class="tt-positive">+${{ transaction.amount|floatformat:2 }}</span>
+                                    {% elif transaction.amount < 0 %}
+                                        <span class="tt-negative">${{ transaction.amount|floatformat:2 }}</span>
+                                    {% else %}
+                                        $0.00
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Edit History -->
+        {% if edit_history %}
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Recent Edit History</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Action</th>
+                                <th>Changes</th>
+                                <th>User</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for edit in edit_history %}
+                            <tr>
+                                <td>
+                                    <div class="small">{{ edit.created_at|date:"M d, Y" }}</div>
+                                    <div class="small text-muted">{{ edit.created_at|date:"g:i A" }}</div>
+                                </td>
+                                <td>
+                                    <span class="badge 
+                                        {% if edit.action == 'create' %}bg-success
+                                        {% elif edit.action == 'update' %}bg-primary
+                                        {% elif edit.action == 'delete' %}bg-danger
+                                        {% else %}bg-secondary{% endif %}">
+                                        {{ edit.get_action_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if edit.changes %}
+                                        <small class="text-muted">{{ edit.changes|truncatechars:50 }}</small>
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ edit.user.username }}</small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    {% endif %}
+</div>
+
+<style>
+.tt-positive {
+    color: #059669;
+    font-weight: 500;
+}
+
+.tt-negative {
+    color: #dc2626;
+    font-weight: 500;
+}
+
+.badge-asset-equity {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.badge-asset-option {
+    background-color: #8b5cf6;
+    color: white;
+}
+
+.badge-asset-crypto {
+    background-color: #f59e0b;
+    color: white;
+}
+
+.badge-asset-future {
+    background-color: #10b981;
+    color: white;
+}
+
+.badge-asset-other {
+    background-color: #6b7280;
+    color: white;
+}
+
+.badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.card-title {
+    color: #374151;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) > td {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+</style>
+
+{% endblock %}
